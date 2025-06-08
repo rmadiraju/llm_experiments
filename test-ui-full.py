@@ -28,6 +28,7 @@ def extract_text_chat(sys_prompt, question):
     except Exception as e:
         return f"Error occurred extracting PDF file {e}"
     try:
+        print (question)
         response = ollama.chat(
             model='llama3.1',
             messages=[
@@ -38,7 +39,7 @@ def extract_text_chat(sys_prompt, question):
                {"role": "user", "content": f"{pdf_text}"},
                 {
                     'role': 'user',
-                    'My question': question
+                    'content': question
                 }
             ]
         )
