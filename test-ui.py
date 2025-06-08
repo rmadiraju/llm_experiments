@@ -7,16 +7,15 @@ from langchain_ollama.embeddings import OllamaEmbeddings
 import gradio as gr
 import ollama
 
-ollama_model = "llama3"
-embeddings = OllamaEmbeddings(model=ollama_model)
-file_path = "<PATH TO>2019-Toyota-Warranty-Handbook-1.pdf"
+file_path = "/Users/rmadiraju/workspace/python-projects/vehicle-manual/2019-Toyota-Warranty-Handbook-1.pdf"
 file_name = "2019-Toyota-Warranty-Handbook-1.pdf"
 
 class VectorStore:
     def __init__(self):
         self.pdf_name = file_name
         self.pdf_path = file_path
-        self.embeddings = OpenAIEmbeddings()
+        ollama_model = "llama3"
+        self.embeddings = OllamaEmbeddings(model=ollama_model)
         self.retrieval_chain = None
         self.vector_store = None
         self.load_data()
@@ -29,7 +28,7 @@ class VectorStore:
         )
         docs = text_splitter.split_documents(documents=documents)
 
-        self.vector_store = FAISS.from_documents(docs, embeddings)
+        self.vector_store = FAISS.from_documents(docs, self.embeddings)
 
 
 
@@ -45,7 +44,7 @@ class VectorStore:
 
 vectorStore = VectorStore()
 # system_prompt = "Answer the question from user with the below context"
-system_prompt = ""
+system_prompt = "You are expert in deciding if the claims coming from user is part of manufacturer warranty or not. Answer yes or no and give explanation with less than 100 words"
 
 def extract(question, sys_prompt, top_k):
     try:
