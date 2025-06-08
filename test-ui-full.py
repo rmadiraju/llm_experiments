@@ -42,6 +42,7 @@ class VectorStore:
             print(f"* {doc.page_content} [{doc.metadata}]")
         return chunks
 
+vectorstore = VectorStore()
 
 def extract_text_from_pdf(pdf_path):
     """Extracts and returns all text from a PDF file."""
@@ -58,6 +59,7 @@ def extract_text_chat(sys_prompt, question, top_k, pdf_option):
     """
     try:
         if pdf_option:
+            print("Using Entire PDF")
             pdf_text = extract_text_from_pdf(file_path)
             messages = [
                 {'role': 'system', 'content': sys_prompt},
@@ -66,7 +68,7 @@ def extract_text_chat(sys_prompt, question, top_k, pdf_option):
             ]
         else:
             try:
-                vectorstore = VectorStore()
+                print ("Chunking the PDF")
                 chunks = vectorstore.retrieve_doc(question, top_k)
             except Exception as e:
                 return f"Error retrieving document chunks: {e}"
