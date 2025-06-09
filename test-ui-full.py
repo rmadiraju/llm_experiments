@@ -2,124 +2,132 @@ import os
 import fitz  # PyMuPDF
 import gradio as gr
 import ollama
+import boto3
+import json
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings, OpenAI
+from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_ollama.embeddings import OllamaEmbeddings
 
-# Constants
+# --- Constants ---
 file_path = "/Users/p0n00ct/PycharmProjects/llm_experiments/SampleFiles/2019-Toyota-Warranty-Handbook-1.pdf"
 file_name = "2019-Toyota-Warranty-Handbook-1.pdf"
 ollama_model = "llama3.1"
+claude_model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+bedrock_region = "us-east-1"
 
-
+# --- Vector Store (initialized once) ---
 class VectorStore:
     def __init__(self):
-        self.pdf_name = file_name
-        self.pdf_path = file_path
         self.embeddings = OllamaEmbeddings(model=ollama_model)
         self.vector_store = None
         self.load_data()
 
     def load_data(self):
-        loader = PyPDFLoader(file_path=self.pdf_path)
+        loader = PyPDFLoader(file_path=file_path)
         documents = loader.load()
-
-        text_splitter = CharacterTextSplitter(
-            chunk_size=900000,
-            chunk_overlap=300,
-            separator="\n"
-        )
+        text_splitter = CharacterTextSplitter(chunk_size=900000, chunk_overlap=300)
         docs = text_splitter.split_documents(documents)
         self.vector_store = FAISS.from_documents(docs, self.embeddings)
 
     def retrieve_doc(self, query, top_k):
-        """Retrieves top_k relevant document chunks using similarity search."""
         results = self.vector_store.similarity_search(query=query, k=top_k)
-        chunks = [doc.page_content for doc in results]
-        for doc in results:
-            print(f"* {doc.page_content} [{doc.metadata}]")
-        return chunks
+        return [doc.page_content for doc in results]
 
-vectorstore = VectorStore()
+#vectorstore_instance = VectorStore()
 
+# --- Helpers ---
 def extract_text_from_pdf(pdf_path):
-    """Extracts and returns all text from a PDF file."""
     doc = fitz.open(pdf_path)
     text = "".join(page.get_text() for page in doc)
     doc.close()
     return text
 
+def query_claude_bedrock(system_prompt, user_question):
+    """Call Claude 3.5 via Amazon Bedrock using the Messages API."""
+    bedrock = boto3.client("bedrock-runtime", region_name=bedrock_region)
 
-def extract_text_chat(sys_prompt, question, top_k, pdf_option):
-    """
-    Sends either full PDF content or relevant chunks to Ollama's LLaMA model
-    and returns the response.
-    """
+    # Combine system prompt and user question into one user message
+    full_prompt = f"{system_prompt}\n\n{user_question}"
+
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "messages": [
+            {"role": "user", "content": full_prompt}
+        ],
+        "max_tokens": 1024,
+        "temperature": 0.7,
+        "top_p": 0.9
+    }
+
+    response = bedrock.invoke_model(
+        modelId=claude_model_id,
+        body=json.dumps(body),
+        contentType="application/json",
+        accept="application/json"
+    )
+
+    result = json.loads(response["body"].read())
+    return result["content"]
+
+def extract_text_chat(system_prompt, question, top_k, pdf_option, backend_choice):
     try:
         if pdf_option:
-            print("Using Entire PDF")
-            pdf_text = extract_text_from_pdf(file_path)
-            messages = [
-                {'role': 'system', 'content': sys_prompt},
-                {'role': 'user', 'content': pdf_text},
-                {'role': 'user', 'content': question}
-            ]
+            content = extract_text_from_pdf(file_path)
         else:
-            try:
-                print ("Chunking the PDF")
-                chunks = vectorstore.retrieve_doc(question, top_k)
-            except Exception as e:
-                return f"Error retrieving document chunks: {e}"
+            chunks = vectorstore_instance.retrieve_doc(question, top_k)
+            content = "\n-------------\n".join(chunks)
 
-            context = "-------------".join(chunks)
+        if backend_choice == "Claude 3.5":
+            prompt = f"{system_prompt}\n\nContext:\n{content}\n\nQuestion:\n{question}"
+            return query_claude_bedrock(system_prompt, prompt)
+        else:
             messages = [
-                {
-                    'role': 'system',
-                    'content': f"{sys_prompt}\n\n####### Context ######\n{context}"
-                },
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': content},
                 {'role': 'user', 'content': question}
             ]
+            response = ollama.chat(model=ollama_model, messages=messages)
+            return response['message']['content']
 
-        response = ollama.chat(model=ollama_model, messages=messages)
-        print(f"\n\nResponse:\n\n{response['message']['content']}")
-        return response['message']['content']
-
-    except Exception as ex:
-        return f"Error generating response: {ex}"
-
+    except Exception as e:
+        return f"❌ Error: {e}"
 
 def handle_pdf_option(option):
-    """Returns True if 'Entire PDF' is selected, else False."""
     return option == "Entire PDF"
 
-
-# UI setup
+# --- UI ---
 with gr.Blocks() as demo:
     pdf_option_state = gr.State(value=True)
 
     with gr.Row():
         with gr.Column(scale=1, min_width=300):
-            text_system = gr.Textbox(label="System Prompt")
-            text_input = gr.Textbox(label="Question")
-            top_k = gr.Number(label="Top K", value=1)
+            text_system = gr.Textbox(label="System Prompt", placeholder="You are a helpful assistant.")
+            text_input = gr.Textbox(label="Question", placeholder="Ask a question about the PDF...")
+            top_k = gr.Number(label="Top K Chunks", value=2, precision=0)
 
-            radio = gr.Radio(
+            radio_pdf = gr.Radio(
                 ["Entire PDF", "Chunk PDF"],
                 label="PDF Processing Mode",
                 interactive=True
             )
-            radio.change(fn=handle_pdf_option, inputs=radio, outputs=pdf_option_state)
+            radio_pdf.change(fn=handle_pdf_option, inputs=radio_pdf, outputs=pdf_option_state)
+
+            backend_choice = gr.Radio(
+                ["llama3.1", "Claude 3.5"],
+                label="Choose LLM Backend",
+                interactive=True
+            )
 
             submit_button = gr.Button("Submit")
 
         with gr.Column(scale=2, min_width=300):
-            text_output = gr.Textbox(label="Output")
+            text_output = gr.Textbox(label="Response", lines=15)
 
     submit_button.click(
         fn=extract_text_chat,
-        inputs=[text_system, text_input, top_k, pdf_option_state],
+        inputs=[text_system, text_input, top_k, pdf_option_state, backend_choice],
         outputs=text_output
     )
 
