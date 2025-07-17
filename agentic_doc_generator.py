@@ -1,11 +1,12 @@
 from typing import TypedDict, Optional, List
 import os
 import logging
-from datetime import datetime
 import ollama
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
 # Configure logging
 logging.basicConfig(
@@ -37,9 +38,9 @@ class DocumentState(TypedDict):
 
 
 def load_system_prompt() -> str:
-    """Load the system prompt from file"""
     try:
-        with open('documentation-generator/system_prompt.txt', 'r') as f:
+        base_dir = os.path.dirname(__file__)
+        with open(os.path.join(base_dir, 'system_prompt.txt'), 'r') as f:
             return f.read()
     except FileNotFoundError:
         logger.error("system_prompt.txt not found")
@@ -47,9 +48,9 @@ def load_system_prompt() -> str:
 
 
 def load_documentation_details() -> str:
-    """Load documentation details from file"""
     try:
-        with open('documentation-generator/documentation_details.txt', 'r') as f:
+        base_dir = os.path.dirname(__file__)
+        with open(os.path.join(base_dir, 'documentation_details.txt'), 'r') as f:
             return f.read()
     except FileNotFoundError:
         logger.error("documentation_details.txt not found")
@@ -57,7 +58,6 @@ def load_documentation_details() -> str:
 
 
 def call_llm(messages: List[dict]) -> str:
-    """Call the LLM with the given messages"""
     try:
         logger.info(f"Calling LLM with {len(messages)} messages")
         response = ollama.chat(
@@ -71,7 +71,6 @@ def call_llm(messages: List[dict]) -> str:
 
 
 def planning_agent(state: DocumentState) -> DocumentState:
-    """Agent responsible for creating the document plan"""
     logger.info("=== PLANNING AGENT STARTED ===")
     system_prompt = load_system_prompt()
     doc_details = load_documentation_details()
@@ -109,7 +108,6 @@ Format your response as a structured plan with clear sections and subsections.
 
 
 def writing_agent(state: DocumentState) -> DocumentState:
-    """Agent responsible for writing the document content"""
     logger.info("=== WRITING AGENT STARTED ===")
     system_prompt = load_system_prompt()
     doc_details = load_documentation_details()
@@ -148,7 +146,6 @@ Write the complete document content now.
 
 
 def review_agent(state: DocumentState) -> DocumentState:
-    """Agent responsible for reviewing the document"""
     logger.info("=== REVIEW AGENT STARTED ===")
     system_prompt = load_system_prompt()
     doc_details = load_documentation_details()
@@ -174,7 +171,7 @@ Review the document for:
 6. Compliance - Does it meet all requirements from documentation_details.txt?
 
 Provide detailed feedback with specific suggestions for improvement.
-If the document is perfect, respond with "APPROVED - No revisions needed."
+If the document is perfect, respond with "APPROVED - NO REVISIONS NEEDED."
 Otherwise, provide specific revision recommendations.
 """
     messages = [
@@ -192,7 +189,6 @@ Otherwise, provide specific revision recommendations.
 
 
 def revision_agent(state: DocumentState) -> DocumentState:
-    """Agent responsible for revising the document based on feedback"""
     logger.info("=== REVISION AGENT STARTED ===")
     system_prompt = load_system_prompt()
     doc_details = load_documentation_details()
@@ -233,8 +229,28 @@ Provide the revised document content.
     }
 
 
+def workflow_router(state: DocumentState) -> str:
+    logger.info("=== WORKFLOW ROUTER ===")
+    if not state.get('plan'):
+        logger.info("Routing to planning agent")
+        return "planning"
+    if not state.get('content'):
+        logger.info("Routing to writing agent")
+        return "writing"
+    if not state.get('review_feedback'):
+        logger.info("Routing to review agent")
+        return "review"
+    if state.get('is_approved'):
+        logger.info("Document approved, ending workflow")
+        return "end"
+    if state.get('revision_count', 0) >= MAX_REVISION_ATTEMPTS:
+        logger.info(f"Maximum revision attempts ({MAX_REVISION_ATTEMPTS}) reached, ending workflow")
+        return "end"
+    logger.info("Routing to revision agent")
+    return "revision"
+
+
 def generate_pdf(content: str, filename: str = "generated_documentation.pdf"):
-    """Generate PDF from the document content"""
     logger.info("=== PDF GENERATION STARTED ===")
     try:
         doc = SimpleDocTemplate(filename, pagesize=letter)
@@ -264,8 +280,51 @@ def generate_pdf(content: str, filename: str = "generated_documentation.pdf"):
         return None
 
 
+def end_workflow(state: DocumentState) -> DocumentState:
+    logger.info("=== ENDING WORKFLOW ===")
+    if state.get('content'):
+        pdf_filename = generate_pdf(state['content'])
+        if pdf_filename:
+            logger.info(f"Document generation completed successfully. PDF saved as: {pdf_filename}")
+        else:
+            logger.error("PDF generation failed")
+    else:
+        logger.error("No content to generate PDF from")
+    return state
+
+
+def create_workflow() -> StateGraph:
+    workflow = StateGraph(DocumentState)
+    workflow.add_node("planning", planning_agent)
+    workflow.add_node("writing", writing_agent)
+    workflow.add_node("review", review_agent)
+    workflow.add_node("revision", revision_agent)
+    workflow.add_node("end", end_workflow)
+    workflow.set_entry_point("planning")
+    workflow.add_conditional_edges(
+        "planning",
+        workflow_router,
+        ["writing", "review", "revision", "end"]
+    )
+    workflow.add_conditional_edges(
+        "writing",
+        workflow_router,
+        ["review", "revision", "end"]
+    )
+    workflow.add_conditional_edges(
+        "review",
+        workflow_router,
+        ["revision", "end"]
+    )
+    workflow.add_conditional_edges(
+        "revision",
+        workflow_router,
+        ["review", "end"]
+    )
+    return workflow.compile()
+
+
 def main():
-    """Main function to run the document generation workflow"""
     logger.info("=== DOCUMENT GENERATION WORKFLOW STARTED ===")
     initial_state: DocumentState = {
         'topic': "User Manual for Customer Management System",
@@ -277,30 +336,14 @@ def main():
         'is_approved': False,
         'messages': []
     }
-    # Planning Phase
-    logger.info("Starting Planning Phase...")
-    state = planning_agent(initial_state)
-    # Writing Phase
-    logger.info("Starting Writing Phase...")
-    state = writing_agent(state)
-    # Review and Revision Loop
-    while not state['is_approved'] and state['revision_count'] < MAX_REVISION_ATTEMPTS:
-        logger.info(f"Starting Review Phase (Attempt {state['revision_count'] + 1})...")
-        state = review_agent(state)
-        if not state['is_approved']:
-            logger.info("Starting Revision Phase...")
-            state = revision_agent(state)
-    # Generate PDF
-    if state['content']:
-        pdf_filename = generate_pdf(state['content'])
-        if pdf_filename:
-            logger.info(f"Document generation completed successfully. PDF saved as: {pdf_filename}")
-        else:
-            logger.error("PDF generation failed")
-    else:
-        logger.error("No content to generate PDF from")
+    workflow = create_workflow()
+    checkpointer = MemorySaver()
+    final_state = workflow.invoke(
+        initial_state,
+        config={"thread_id": "doc_generation"}
+    )
     logger.info("=== DOCUMENT GENERATION WORKFLOW COMPLETED ===")
-    return state
+    return final_state
 
 
 if __name__ == "__main__":
