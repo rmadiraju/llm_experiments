@@ -28,6 +28,8 @@ class LLMFactory:
             llm = self._create_anthropic_llm(config)
         elif config.provider == "bedrock":
             llm = self._create_bedrock_llm(config)
+        elif config.provider == "ollama":
+            llm = self._create_ollama_llm(config)
         else:
             raise ValueError(f"Unsupported LLM provider: {config.provider}")
         
@@ -73,6 +75,21 @@ class LLMFactory:
                 "temperature": config.temperature,
                 "max_tokens": config.max_tokens
             }
+        )
+    
+    def _create_ollama_llm(self, config: LLMConfig):
+        """Create Ollama LLM instance"""
+        try:
+            from langchain_community.llms import Ollama
+        except ImportError:
+            raise ImportError("langchain-community is required for Ollama support")
+        
+        base_url = os.getenv(config.api_key_env or "OLLAMA_BASE_URL", "http://localhost:11434")
+        
+        return Ollama(
+            model=config.model,
+            base_url=base_url,
+            temperature=config.temperature
         )
     
     def clear_cache(self):

@@ -1,0 +1,204 @@
+workflow:
+  name: "Java Spring Boot Code Generator"
+  description: "A multi-agent workflow that generates Java Spring Boot code from requirements"
+  
+  settings:
+    max_iterations: 15
+    timeout: 600  # 10 minutes for code generation
+    
+  llm_configs:
+    llama_local:
+      provider: "ollama"
+      model: "llama2:13b"
+      method: "chat"
+      temperature: 0.1
+      max_tokens: 4000
+      api_key_env: "OLLAMA_BASE_URL"
+      
+    bedrock_claude:
+      provider: "bedrock"
+      model: "anthropic.claude-3-sonnet-20240229-v1:0"
+      method: "generate"
+      temperature: 0.1
+      max_tokens: 4000
+      region: "us-east-1"
+      
+  tools:
+    file_writer:
+      name: "file_writer"
+      description: "Write code files to the filesystem"
+      input_schema:
+        file_path:
+          type: "string"
+          description: "Path to the file to write"
+        content:
+          type: "string"
+          description: "Content to write to the file"
+      output_schema:
+        success:
+          type: "boolean"
+          description: "Whether the file was written successfully"
+        file_path:
+          type: "string"
+          description: "Path of the written file"
+          
+    directory_creator:
+      name: "directory_creator"
+      description: "Create directories in the filesystem"
+      input_schema:
+        directory_path:
+          type: "string"
+          description: "Path to the directory to create"
+      output_schema:
+        success:
+          type: "boolean"
+          description: "Whether the directory was created successfully"
+        directory_path:
+          type: "string"
+          description: "Path of the created directory"
+          
+    file_reader:
+      name: "file_reader"
+      description: "Read content from files"
+      input_schema:
+        file_path:
+          type: "string"
+          description: "Path to the file to read"
+      output_schema:
+        content:
+          type: "string"
+          description: "File content"
+          
+    code_validator:
+      name: "code_validator"
+      description: "Validate Java code syntax and structure"
+      input_schema:
+        code:
+          type: "string"
+          description: "Java code to validate"
+        file_type:
+          type: "string"
+          description: "Type of file (java, xml, properties, etc.)"
+      output_schema:
+        is_valid:
+          type: "boolean"
+          description: "Whether the code is valid"
+        errors:
+          type: "array"
+          description: "List of validation errors"
+        suggestions:
+          type: "array"
+          description: "List of improvement suggestions"
+          
+  agents:
+    requirements_analyzer:
+      type: "react_agent"
+      llm_config: "llama_local"
+      system_prompt: |
+        You are a requirements analysis expert for Java Spring Boot projects.
+        Your role is to:
+        1. Read and understand the requirements from the markdown file
+        2. Extract key information about the project structure
+        3. Identify required components (controllers, services, repositories, entities)
+        4. Plan the folder structure and file organization
+        5. Create a detailed implementation plan
+        
+        Always provide clear, structured analysis and planning.
+      tools: ["file_reader"]
+      next: "architecture_planner"
+      
+    architecture_planner:
+      type: "react_agent"
+      llm_config: "llama_local"
+      system_prompt: |
+        You are a software architecture expert specializing in Java Spring Boot.
+        Your role is to:
+        1. Design the application architecture based on requirements
+        2. Plan the package structure and dependencies
+        3. Define entity relationships and database schema
+        4. Plan API endpoints and REST structure
+        5. Create a comprehensive architecture document
+        
+        Focus on best practices and clean architecture principles.
+      tools: []
+      next: "code_generator"
+      
+    code_generator:
+      type: "react_agent"
+      llm_config: "llama_local"
+      system_prompt: |
+        You are a Java Spring Boot code generation expert.
+        Your role is to:
+        1. Generate complete, working Java Spring Boot code
+        2. Create proper folder structure and package organization
+        3. Generate all necessary files (pom.xml, application.properties, etc.)
+        4. Implement controllers, services, repositories, and entities
+        5. Follow Spring Boot best practices and conventions
+        
+        Always generate complete, compilable code with proper imports and annotations.
+      tools: ["file_writer", "directory_creator"]
+      next: "code_verifier"
+      
+    code_verifier:
+      type: "react_agent"
+      llm_config: "llama_local"
+      system_prompt: |
+        You are a code verification expert for Java Spring Boot projects.
+        Your role is to:
+        1. Verify the generated code for syntax correctness
+        2. Check for proper Spring Boot annotations and structure
+        3. Validate package organization and imports
+        4. Ensure all required components are present
+        5. Provide feedback and suggestions for improvements
+        
+        Be thorough in your verification and provide detailed feedback.
+      tools: ["code_validator", "file_reader"]
+      next: "documentation_generator"
+      
+    documentation_generator:
+      type: "react_agent"
+      llm_config: "llama_local"
+      system_prompt: |
+        You are a technical documentation expert.
+        Your role is to:
+        1. Generate comprehensive README.md for the project
+        2. Create API documentation
+        3. Document setup and running instructions
+        4. Create deployment guides
+        5. Generate code comments and JavaDoc
+        
+        Make documentation clear, comprehensive, and user-friendly.
+      tools: ["file_writer"]
+      next: null
+      
+  conditional_edges:
+    quality_check:
+      from: "code_verifier"
+      to: "code_generator"
+      condition:
+        type: "content_based"
+        function: "needs_regeneration"
+        parameters:
+          min_quality_score: 0.8
+          required_components: ["controller", "service", "repository", "entity"]
+          
+    final_approval:
+      from: "documentation_generator"
+      to: "code_generator"
+      condition:
+        type: "custom_function"
+        function: "needs_final_touch"
+        parameters:
+          max_iterations: 3
+          
+  custom_functions:
+    needs_regeneration:
+      description: "Check if code needs regeneration based on quality metrics"
+      parameters:
+        min_quality_score: "float"
+        required_components: "list"
+        
+    needs_final_touch:
+      description: "Check if final improvements are needed"
+      parameters:
+        max_iterations: "int" 

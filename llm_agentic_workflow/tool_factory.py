@@ -33,6 +33,12 @@ class ToolFactory:
             tool = self._create_file_reader_tool(config)
         elif config.name == "calculator":
             tool = self._create_calculator_tool(config)
+        elif config.name == "file_writer":
+            tool = self._create_file_writer_tool(config)
+        elif config.name == "directory_creator":
+            tool = self._create_directory_creator_tool(config)
+        elif config.name == "code_validator":
+            tool = self._create_code_validator_tool(config)
         elif config.name in self._custom_tools:
             tool = self._create_custom_tool(config)
         else:
@@ -98,6 +104,107 @@ class ToolFactory:
             name=config.name,
             description=config.description,
             func=calculator
+        )
+    
+    def _create_file_writer_tool(self, config: ToolConfig) -> BaseTool:
+        """Create file writer tool"""
+        def file_writer(file_path: str, content: str) -> str:
+            """Write content to a file"""
+            try:
+                # Ensure the directory exists
+                import os
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    file.write(content)
+                return f"Successfully wrote content to '{file_path}'"
+            except Exception as e:
+                return f"Error writing to file '{file_path}': {str(e)}"
+        
+        return Tool(
+            name=config.name,
+            description=config.description,
+            func=file_writer
+        )
+    
+    def _create_directory_creator_tool(self, config: ToolConfig) -> BaseTool:
+        """Create directory creator tool"""
+        def directory_creator(directory_path: str) -> str:
+            """Create a directory"""
+            try:
+                import os
+                os.makedirs(directory_path, exist_ok=True)
+                return f"Successfully created directory '{directory_path}'"
+            except Exception as e:
+                return f"Error creating directory '{directory_path}': {str(e)}"
+        
+        return Tool(
+            name=config.name,
+            description=config.description,
+            func=directory_creator
+        )
+    
+    def _create_code_validator_tool(self, config: ToolConfig) -> BaseTool:
+        """Create code validator tool"""
+        def code_validator(code: str, file_type: str) -> str:
+            """Validate Java code syntax and structure"""
+            try:
+                errors = []
+                suggestions = []
+                
+                # Basic Java syntax validation
+                if file_type.lower() == "java":
+                    # Check for basic Java structure
+                    if "public class" not in code and "public interface" not in code and "public enum" not in code:
+                        if "class" in code or "interface" in code or "enum" in code:
+                            errors.append("Missing 'public' modifier")
+                    
+                    # Check for proper package declaration
+                    if "package" not in code and "import" in code:
+                        suggestions.append("Consider adding package declaration")
+                    
+                    # Check for proper imports
+                    if "import" in code and ";" not in code.split("import")[1].split("\n")[0]:
+                        errors.append("Invalid import statement")
+                    
+                    # Check for proper annotations
+                    if "@" in code and "(" not in code.split("@")[1].split("\n")[0]:
+                        errors.append("Invalid annotation syntax")
+                
+                # XML validation for pom.xml
+                elif file_type.lower() == "xml":
+                    if "<project" not in code:
+                        errors.append("Missing project root element")
+                    if "<groupId>" not in code:
+                        errors.append("Missing groupId")
+                    if "<artifactId>" not in code:
+                        errors.append("Missing artifactId")
+                
+                # Properties validation
+                elif file_type.lower() == "properties":
+                    if "=" not in code and ":" not in code:
+                        errors.append("Invalid properties format")
+                
+                # YAML validation
+                elif file_type.lower() == "yml" or file_type.lower() == "yaml":
+                    if "spring:" not in code and "server:" not in code:
+                        suggestions.append("Consider adding Spring Boot configuration")
+                
+                result = {
+                    "is_valid": len(errors) == 0,
+                    "errors": errors,
+                    "suggestions": suggestions
+                }
+                
+                return f"Validation result: {result}"
+                
+            except Exception as e:
+                return f"Error validating code: {str(e)}"
+        
+        return Tool(
+            name=config.name,
+            description=config.description,
+            func=code_validator
         )
     
     def _create_custom_tool(self, config: ToolConfig) -> BaseTool:
