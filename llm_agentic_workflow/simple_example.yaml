@@ -1,0 +1,62 @@
+workflow:
+  name: "Simple Example Workflow"
+  description: "A simple workflow demonstrating the system capabilities"
+  
+  settings:
+    max_iterations: 3
+    timeout: 120
+    
+  llm_configs:
+    simple_llm:
+      provider: "openai"
+      model: "gpt-3.5-turbo"
+      method: "chat"
+      temperature: 0.1
+      max_tokens: 500
+      api_key_env: "OPENAI_API_KEY"
+      
+  tools:
+    calculator:
+      name: "calculator"
+      description: "Perform mathematical calculations"
+      input_schema:
+        expression:
+          type: "string"
+          description: "Mathematical expression to evaluate"
+      output_schema:
+        result:
+          type: "number"
+          description: "Calculation result"
+          
+    file_reader:
+      name: "file_reader"
+      description: "Read content from files"
+      input_schema:
+        file_path:
+          type: "string"
+          description: "Path to the file to read"
+      output_schema:
+        content:
+          type: "string"
+          description: "File content"
+          
+  agents:
+    processor:
+      type: "react_agent"
+      llm_config: "simple_llm"
+      system_prompt: |
+        You are a helpful assistant that processes user requests.
+        You can use tools to help with calculations and file operations.
+        Always be helpful and provide clear explanations.
+      tools: ["calculator", "file_reader"]
+      next: "summarizer"
+      
+    summarizer:
+      type: "react_agent"
+      llm_config: "simple_llm"
+      system_prompt: |
+        You are a summarization expert. Create concise, clear summaries
+        of the information provided to you. Focus on the key points
+        and make the summary easy to understand.
+      tools: []
+      next: null 
