@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS Bedrock + LangChain/LangGraph Support Agent Design</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #182244;
+      --text: #e9eefc;
+      --muted: #b6c1e3;
+      --accent: #78a6ff;
+      --accent-2: #8cf0d0;
+      --border: #2b396b;
+      --good: #74d99f;
+      --warn: #ffd27a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #0a0f1d 0%, #0f1630 100%);
+      line-height: 1.55;
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; padding: 28px; }
+    .hero {
+      background: radial-gradient(circle at top left, rgba(120,166,255,.18), transparent 34%),
+                  radial-gradient(circle at top right, rgba(140,240,208,.12), transparent 30%),
+                  linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    h1, h2, h3 { line-height: 1.2; margin: 0 0 14px; }
+    h1 { font-size: 34px; }
+    h2 {
+      font-size: 24px;
+      margin-top: 26px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    h3 { font-size: 18px; margin-top: 22px; }
+    p { color: var(--muted); margin: 10px 0; }
+    .pill {
+      display: inline-block;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(120,166,255,.12);
+      color: #dce7ff;
+      border: 1px solid rgba(120,166,255,.24);
+      margin-right: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .grid { display: grid; gap: 18px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      background: rgba(18,25,51,.9);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .small { font-size: 14px; }
+    .muted { color: var(--muted); }
+    .strong { color: var(--text); font-weight: 700; }
+    .diagram {
+      margin-top: 14px;
+      background: #0b1227;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      overflow-x: auto;
+    }
+    .flow {
+      display: grid;
+      gap: 12px;
+      min-width: 920px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+    .box {
+      background: linear-gradient(180deg, rgba(120,166,255,.12), rgba(255,255,255,.02));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      min-height: 90px;
+    }
+    .box.green { background: linear-gradient(180deg, rgba(116,217,159,.12), rgba(255,255,255,.02)); }
+    .box.yellow { background: linear-gradient(180deg, rgba(255,210,122,.12), rgba(255,255,255,.02)); }
+    .arrow {
+      text-align: center;
+      color: var(--accent-2);
+      font-weight: 800;
+      letter-spacing: 2px;
+      margin: -4px 0;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      color: #dfe8ff;
+    }
+    code {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      padding: 1px 6px;
+      color: #eef4ff;
+    }
+    ul { margin: 10px 0 0 18px; color: var(--muted); }
+    li { margin: 7px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+    }
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      vertical-align: top;
+      text-align: left;
+      font-size: 14px;
+    }
+    th { background: rgba(120,166,255,.12); color: #eef4ff; }
+    tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+    .footer {
+      margin: 28px 0 10px;
+      color: #9fb0de;
+      font-size: 13px;
+    }
+    @media (max-width: 900px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      h1 { font-size: 28px; }
+      .wrap { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <span class="pill">AWS Bedrock</span>
+        <span class="pill">LangChain</span>
+        <span class="pill">LangGraph</span>
+        <span class="pill">OpenSearch</span>
+        <span class="pill">Support Agent</span>
+      </div>
+      <h1>Support Agent Design: AWS Bedrock + LangChain/LangGraph</h1>
+      <p>
+        This design describes how to build a production-grade support agent that answers questions using
+        OpenSearch, APIs, logs, and workflow logic. The primary implementation pattern is <span class="strong">Bedrock for models and guardrails</span>,
+        <span class="strong">LangGraph for orchestration</span>, and <span class="strong">LangChain for tool and model integration</span>.
+        A separate optional section shows where <span class="strong">Amazon Bedrock AgentCore Runtime</span> fits if you want AWS-managed agent hosting.
+      </p>
+    </section>
+
+    <section class="grid grid-3" style="margin-top:18px;">
+      <div class="card">
+        <h3>Primary Goal</h3>
+        <p>Answer user support questions reliably using evidence from knowledge, operational data, and logs.</p>
+      </div>
+      <div class="card">
+        <h3>Design Principle</h3>
+        <p>Build a <span class="strong">workflow-driven agent</span>, not one giant prompt. Keep routing, retrieval, tool usage, and synthesis explicit.</p>
+      </div>
+      <div class="card">
+        <h3>Key Outcome</h3>
+        <p>Responses include <span class="strong">grounding, confidence, source attribution, and next actions</span>.</p>
+      </div>
+    </section>
+
+    <h2>1. High-Level Architecture</h2>
+    <div class="diagram">
+      <div class="flow">
+        <div class="row">
+          <div class="box green"><strong>User / Chat UI</strong><br/>Web app, Slack, Teams, internal portal, support console</div>
+          <div class="box"><strong>API Layer</strong><br/>API Gateway or ALB + auth + rate limits</div>
+          <div class="box green"><strong>Support Agent Orchestrator</strong><br/>LangGraph state machine</div>
+          <div class="box"><strong>LLM Layer</strong><br/>Amazon Bedrock models</div>
+          <div class="box green"><strong>Answer</strong><br/>Citations, confidence, actions, escalation hint</div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="row">
+          <div class="box"><strong>Intent Router</strong><br/>Rule + model-based classification</div>
+          <div class="box"><strong>Retrieval Planner</strong><br/>Chooses KB, API, logs, or mixed path</div>
+          <div class="box"><strong>Tool Execution Layer</strong><br/>Typed wrappers for APIs and log queries</div>
+          <div class="box"><strong>Safety Layer</strong><br/>Bedrock Guardrails + custom policy checks</div>
+          <div class="box"><strong>Memory / State</strong><br/>LangGraph state + checkpointing + DynamoDB/Redis</div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="row">
+          <div class="box yellow"><strong>OpenSearch / Bedrock KB</strong><br/>Runbooks, SOPs, tickets, FAQs, docs</div>
+          <div class="box yellow"><strong>Business APIs</strong><br/>Ticket, claim, order, deployment, config, account lookups</div>
+          <div class="box yellow"><strong>Logs / Observability</strong><br/>CloudWatch Logs Insights, traces, metrics, events</div>
+          <div class="box yellow"><strong>Data Stores</strong><br/>DynamoDB, Aurora, S3, config repos</div>
+          <div class="box yellow"><strong>Human Handoff</strong><br/>Escalation queue or support engineer assist</div>
+        </div>
+      </div>
+    </div>
+
+    <h2>2. Core Responsibilities by Layer</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Amazon Bedrock</h3>
+        <ul>
+          <li>Foundation model inference for intent clarification, retrieval planning, synthesis, and structured extraction.</li>
+          <li>Guardrails for harmful content and sensitive-information protection.</li>
+          <li>Optional use of Bedrock Knowledge Bases if you want managed RAG with citations.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>LangChain / LangGraph</h3>
+        <ul>
+          <li>LangChain for tool wrappers, model interfaces, retrievers, and structured output handling.</li>
+          <li>LangGraph for explicit state, node routing, retries, checkpoints, and human-in-the-loop workflow control.</li>
+          <li>Best fit when support logic spans multiple sources and branches.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>3. Recommended End-to-End Flow</h2>
+    <div class="card">
+      <pre>START
+  → Normalize request
+  → AuthN / AuthZ / tenant context lookup
+  → Intent router
+      → docs_kb
+      → api_lookup
+      → logs_debug
+      → mixed_investigation
+      → unsupported / handoff
+  → Entity extraction (service, env, ticket id, claim id, time window, region)
+  → Retrieval planner
+  → Gather evidence from one or more sources
+  → Rank / trim evidence
+  → Compose grounded answer
+  → Guardrail + policy validation
+  → Return answer with confidence + citations + next actions
+END</pre>
+    </div>
+
+    <h2>4. LangGraph Design</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>State Object</h3>
+        <pre>{
+  "request_id": "uuid",
+  "tenant_id": "acme",
+  "user_id": "u123",
+  "question": "Why are claim updates delayed today?",
+  "normalized_question": "...",
+  "intent": "logs_debug",
+  "intent_confidence": 0.91,
+  "entities": {
+    "service": "claim-update-service",
+    "environment": "prod",
+    "time_range": "last_2h",
+    "region": "us-east-1"
+  },
+  "retrieval_plan": ["logs", "api", "kb"],
+  "evidence": [],
+  "policy_flags": [],
+  "answer": null,
+  "confidence": null,
+  "needs_handoff": false
+}</pre>
+      </div>
+      <div class="card">
+        <h3>Suggested Nodes</h3>
+        <ul>
+          <li><code>normalize_request</code></li>
+          <li><code>load_user_context</code></li>
+          <li><code>classify_intent</code></li>
+          <li><code>extract_entities</code></li>
+          <li><code>plan_retrieval</code></li>
+          <li><code>retrieve_kb</code></li>
+          <li><code>call_support_apis</code></li>
+          <li><code>query_logs</code></li>
+          <li><code>rank_evidence</code></li>
+          <li><code>synthesize_answer</code></li>
+          <li><code>apply_guardrails</code></li>
+          <li><code>handoff_or_finish</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>5. Intent Router Design</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Routing Strategy</h3>
+        <p>Use a <span class="strong">hybrid router</span>:</p>
+        <ul>
+          <li><span class="strong">Rules first</span> for obvious patterns such as ticket IDs, claim IDs, deployment IDs, trace IDs.</li>
+          <li><span class="strong">Model classification second</span> for ambiguous or mixed questions.</li>
+          <li><span class="strong">Confidence thresholds</span> determine when to use one path versus multiple paths.</li>
+          <li><span class="strong">Fallback path</span> when confidence is low or access is missing.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Example Intent Output</h3>
+        <pre>{
+  "intent": "mixed_investigation",
+  "confidence": 0.84,
+  "entities": {
+    "ticket_id": "INC-20491",
+    "service": "payment-service",
+    "environment": "prod",
+    "time_range": "last_4h"
+  },
+  "sources_needed": ["api", "logs", "kb"]
+}</pre>
+      </div>
+    </div>
+
+    <h2>6. Source-Specific Retrieval Strategy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Best Used For</th>
+          <th>How To Implement</th>
+          <th>Important Guardrails</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>OpenSearch / Bedrock KB</td>
+          <td>Runbooks, SOPs, support articles, release notes, prior incident summaries, ticket resolutions</td>
+          <td>Chunk content, enrich with metadata, use hybrid retrieval and filters by product/service/env/version</td>
+          <td>Filter by tenant, product, data sensitivity, freshness</td>
+        </tr>
+        <tr>
+          <td>Business APIs</td>
+          <td>Live case status, claim details, order status, workflow state, config state</td>
+          <td>Create typed tools such as <code>get_claim_details</code>, <code>get_ticket_status</code>, <code>get_recent_deployments</code></td>
+          <td>No generic “call any API” tool; enforce authZ and parameter validation</td>
+        </tr>
+        <tr>
+          <td>Logs / Metrics / Traces</td>
+          <td>Incidents, latency, failures, top exceptions, blast radius</td>
+          <td>Use constrained log query tools backed by CloudWatch Logs Insights or observability APIs</td>
+          <td>Redact secrets/PII before model input; enforce time-window bounds</td>
+        </tr>
+        <tr>
+          <td>Config / Data Stores</td>
+          <td>Feature flags, routing rules, environment state, support metadata</td>
+          <td>Read through narrow tools and cache selected output in state</td>
+          <td>Avoid direct broad reads from model-generated queries</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>7. Tool Design Rules</h2>
+    <div class="grid grid-3">
+      <div class="card">
+        <h3>1. Typed Tools Only</h3>
+        <p>Create narrow functions with explicit contracts. Examples: <code>get_ticket_status(ticket_id)</code>, <code>query_service_errors(service, env, minutes_back)</code>.</p>
+      </div>
+      <div class="card">
+        <h3>2. Result Normalization</h3>
+        <p>Every tool returns compact structured output: summary, key fields, timestamps, identifiers, and safe snippets.</p>
+      </div>
+      <div class="card">
+        <h3>3. Source Labels</h3>
+        <p>Attach a source reference to every retrieved artifact so the final answer can cite where evidence came from.</p>
+      </div>
+    </div>
+
+    <h2>8. OpenSearch / Knowledge Design</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Indexing Model</h3>
+        <ul>
+          <li>Documents: SOPs, troubleshooting guides, known-error database, release notes, incident reviews.</li>
+          <li>Chunks: 500–1200 tokens, overlap by 10–15% if documents are procedural.</li>
+          <li>Metadata: <code>tenant</code>, <code>product</code>, <code>service</code>, <code>environment</code>, <code>region</code>, <code>doc_type</code>, <code>version</code>, <code>updated_at</code>.</li>
+          <li>Prefer hybrid retrieval: lexical + semantic.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Answering Strategy</h3>
+        <ul>
+          <li>Retrieve top N chunks.</li>
+          <li>Optionally re-rank if result quality varies.</li>
+          <li>Trim to only the evidence needed for the answer.</li>
+          <li>Return direct source references in the response.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>9. Log Investigation Path</h2>
+    <div class="card">
+      <p>Do not send raw log streams to the model. Instead use the model to <span class="strong">derive a constrained query plan</span>, execute the query outside the model, and then summarize only the returned evidence.</p>
+      <pre>Example path:
+User: "Why did payment retries spike after the 6 PM deploy?"
+  → intent = logs_debug
+  → extract service=payment-service, env=prod, time_range=last_3h
+  → query tool #1: top exceptions by minute
+  → query tool #2: latency p95 and error-rate around deployment window
+  → API tool: recent deployment details
+  → KB tool: known issue article for timeout burst after rollout
+  → synthesis: likely cause + confidence + remediation steps</pre>
+    </div>
+
+    <h2>10. Answer Contract</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Response Shape</h3>
+        <pre>{
+  "answer": "Claim updates are delayed because the ingestion worker backlog increased after a configuration change at 18:04 UTC.",
+  "confidence": "medium",
+  "sources": [
+    {"type": "logs", "ref": "cloudwatch:claim-worker-prod"},
+    {"type": "api", "ref": "deployment-service:release-8821"},
+    {"type": "kb", "ref": "runbook/claim-worker-backlog"}
+  ],
+  "next_actions": [
+    "Scale workers or pause noncritical batch jobs",
+    "Verify queue depth reduction over the next 15 minutes"
+  ],
+  "needs_handoff": false
+}</pre>
+      </div>
+      <div class="card">
+        <h3>Quality Rules</h3>
+        <ul>
+          <li>Never pretend certainty when evidence is partial.</li>
+          <li>Separate facts from inferences.</li>
+          <li>Always note the source class behind the answer.</li>
+          <li>Return useful next actions instead of only diagnosis.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>11. Security and Governance</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Control</th>
+          <th>Implementation Guidance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Authentication</td>
+          <td>SSO / IAM / internal identity</td>
+          <td>Pass tenant and user claims to the agent before retrieval or tool use.</td>
+        </tr>
+        <tr>
+          <td>Authorization</td>
+          <td>Source-level authorization</td>
+          <td>Restrict tools and retrieval by team, tenant, role, region, and environment.</td>
+        </tr>
+        <tr>
+          <td>Safety</td>
+          <td>Bedrock Guardrails</td>
+          <td>Screen prompts and responses, apply denied topics, mask sensitive information.</td>
+        </tr>
+        <tr>
+          <td>Secrets</td>
+          <td>Secrets Manager / IAM roles</td>
+          <td>Never expose credentials to the model or prompt payloads.</td>
+        </tr>
+        <tr>
+          <td>Auditability</td>
+          <td>Trace each step</td>
+          <td>Store request, intent, selected tools, evidence refs, and final answer metadata.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>12. AWS Service Mapping</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Preferred AWS Service</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>LLM inference</td>
+          <td>Amazon Bedrock</td>
+          <td>Choose one primary model for planning/synthesis; optionally a smaller one for classification.</td>
+        </tr>
+        <tr>
+          <td>Guardrails</td>
+          <td>Amazon Bedrock Guardrails</td>
+          <td>Use for prompt and response screening and sensitive-information filtering.</td>
+        </tr>
+        <tr>
+          <td>Knowledge retrieval</td>
+          <td>OpenSearch Service / OpenSearch Serverless / Bedrock Knowledge Bases</td>
+          <td>Use Bedrock KB if you want more managed RAG; use direct OpenSearch for more control.</td>
+        </tr>
+        <tr>
+          <td>Logs</td>
+          <td>CloudWatch Logs Insights</td>
+          <td>Wrap with constrained support-investigation tools.</td>
+        </tr>
+        <tr>
+          <td>Agent state</td>
+          <td>DynamoDB or Redis</td>
+          <td>DynamoDB works well for checkpoint and thread metadata.</td>
+        </tr>
+        <tr>
+          <td>Tool execution</td>
+          <td>Lambda / ECS / private APIs</td>
+          <td>Depends on latency, VPC access, and code packaging needs.</td>
+        </tr>
+        <tr>
+          <td>Observability</td>
+          <td>CloudWatch, X-Ray, OpenTelemetry</td>
+          <td>Trace every node and tool call.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>13. Suggested Project Structure</h2>
+    <div class="card">
+      <pre>support-agent/
+├── app/
+│   ├── api/
+│   │   └── server.py
+│   ├── graph/
+│   │   ├── state.py
+│   │   ├── nodes/
+│   │   │   ├── normalize.py
+│   │   │   ├── router.py
+│   │   │   ├── entities.py
+│   │   │   ├── planner.py
+│   │   │   ├── retrieve_kb.py
+│   │   │   ├── call_apis.py
+│   │   │   ├── query_logs.py
+│   │   │   ├── rank_evidence.py
+│   │   │   ├── synthesize.py
+│   │   │   ├── guardrails.py
+│   │   │   └── handoff.py
+│   │   └── graph.py
+│   ├── tools/
+│   │   ├── tickets.py
+│   │   ├── claims.py
+│   │   ├── deployments.py
+│   │   ├── logs.py
+│   │   └── kb.py
+│   ├── prompts/
+│   │   ├── classify_intent.txt
+│   │   ├── extract_entities.txt
+│   │   ├── plan_retrieval.txt
+│   │   └── synthesize_answer.txt
+│   ├── models/
+│   │   ├── intent.py
+│   │   ├── evidence.py
+│   │   └── response.py
+│   └── config/
+│       ├── settings.py
+│       └── policies.yaml
+├── infra/
+│   ├── terraform/
+│   └── iam/
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── eval/
+└── README.md</pre>
+    </div>
+
+    <h2>14. Implementation Plan</h2>
+    <div class="grid grid-3">
+      <div class="card">
+        <h3>Phase 1: MVP</h3>
+        <ul>
+          <li>3 intents: docs, API lookup, logs</li>
+          <li>5–8 narrow tools</li>
+          <li>Basic citations and confidence</li>
+          <li>Single tenant or limited audience</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Phase 2: Hardening</h3>
+        <ul>
+          <li>AuthZ and data filtering</li>
+          <li>Checkpointing and retries</li>
+          <li>Prompt and tool-call observability</li>
+          <li>Human handoff and escalation</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Phase 3: Optimization</h3>
+        <ul>
+          <li>Reranking and retrieval quality tuning</li>
+          <li>Caching hot queries</li>
+          <li>Offline evaluation sets</li>
+          <li>Multi-turn memory and personalization</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>15. Optional: Where Amazon Bedrock AgentCore Runtime Fits</h2>
+    <div class="card">
+      <p>
+        AgentCore Runtime is optional in this design. Use it when you want an <span class="strong">AWS-managed runtime for deploying and operating the agent</span>.
+        It does <span class="strong">not replace</span> LangGraph workflow design, retrieval design, or tool design. It sits underneath your agent code as the runtime/hosting layer.
+      </p>
+    </div>
+    <div class="diagram">
+      <div class="flow">
+        <div class="row">
+          <div class="box green"><strong>User / UI</strong></div>
+          <div class="box"><strong>API or Direct Invocation</strong></div>
+          <div class="box green"><strong>AgentCore Runtime</strong><br/>Managed execution, session handling, scaling</div>
+          <div class="box"><strong>LangGraph Agent App</strong><br/>Your router, tools, synthesis, checkpoints</div>
+          <div class="box green"><strong>Data Sources</strong><br/>OpenSearch, APIs, logs, KB, stores</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:18px;">
+      <div class="card">
+        <h3>Use AgentCore Runtime When</h3>
+        <ul>
+          <li>You want AWS-managed runtime deployment instead of operating ECS/EKS yourself.</li>
+          <li>You need secure access to VPC-connected internal APIs and data.</li>
+          <li>You want runtime-level sessions, invocation patterns, and operational metrics.</li>
+          <li>You expect the agent to move from prototype to production quickly on AWS.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Skip It Initially When</h3>
+        <ul>
+          <li>You are still iterating heavily on graph design and tool contracts.</li>
+          <li>You already have a container platform and deployment standards.</li>
+          <li>You want to validate workflow quality before optimizing hosting.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>How To Add AgentCore Runtime to This Design</h3>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Integration Steps</h3>
+        <ol class="muted" style="padding-left:18px; margin:8px 0 0;">
+          <li>Build the support agent as a standard LangGraph application first.</li>
+          <li>Externalize config, policies, model selection, and endpoints.</li>
+          <li>Package the app for AgentCore Runtime deployment.</li>
+          <li>Configure runtime permissions and VPC connectivity to internal APIs, OpenSearch, and observability systems.</li>
+          <li>Expose invoke endpoints to your chat UI or API gateway.</li>
+          <li>Add runtime metrics, traces, and alerting.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>What Stays the Same</h3>
+        <ul>
+          <li>LangGraph nodes and state model</li>
+          <li>Tool wrappers and API contracts</li>
+          <li>Bedrock model usage and guardrails</li>
+          <li>Retrieval quality tuning</li>
+          <li>Response format and business safety rules</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>16. Practical Recommendation</h2>
+    <div class="card">
+      <p>
+        Start with <span class="strong">Bedrock + LangGraph + direct tools</span>. Get the router, retrieval plan, source grounding, and answer quality right first.
+        Then decide whether to host the agent on your existing platform or move it to <span class="strong">AgentCore Runtime</span> for managed AWS operation.
+        This keeps the architecture clean: <span class="strong">LangGraph is the agent brain and workflow</span>; <span class="strong">AgentCore Runtime is the hosting shell</span>.
+      </p>
+    </div>
+
+    <h2>17. References</h2>
+    <div class="card small">
+      <ul>
+        <li>Amazon Bedrock Knowledge Bases: managed retrieval-augmented generation and citations.</li>
+        <li>Amazon Bedrock Guardrails: configurable safeguards for prompts and responses.</li>
+        <li>Amazon Bedrock AgentCore Runtime: managed runtime and deployment flow.</li>
+        <li>LangGraph: stateful graph-based orchestration, memory, persistence, and durable execution.</li>
+      </ul>
+    </div>
+
+    <div class="footer">
+      Prepared as an implementation-ready architecture note for a support agent using AWS Bedrock + LangChain/LangGraph, with optional AgentCore Runtime placement.
+    </div>
+  </div>
+</body>
+</html>

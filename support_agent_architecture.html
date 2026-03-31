@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enterprise Support Agent — Architecture &amp; Implementation Guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06080f;
+      --surface-1: #0c1021;
+      --surface-2: #111729;
+      --surface-3: #171f36;
+      --text: #e8ecf8;
+      --text-dim: #8e99be;
+      --text-faint: #5c6788;
+      --accent-blue: #4d8bff;
+      --accent-cyan: #38d9c4;
+      --accent-amber: #f5a623;
+      --accent-rose: #f25f7a;
+      --accent-violet: #a78bfa;
+      --border: rgba(78, 100, 164, 0.18);
+      --border-strong: rgba(78, 100, 164, 0.32);
+      --glow-blue: rgba(77, 139, 255, 0.08);
+      --glow-cyan: rgba(56, 217, 196, 0.06);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Noise overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .page { max-width: 1280px; margin: 0 auto; padding: 40px 32px 80px; }
+
+    /* ── Typography ── */
+    h1 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 52px; line-height: 1.08; letter-spacing: -1px; }
+    h2 { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.2; margin-bottom: 16px; }
+    h3 { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 18px; line-height: 1.3; margin-bottom: 10px; }
+    h4 { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 15px; line-height: 1.3; margin-bottom: 8px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; }
+
+    p { color: var(--text-dim); margin-bottom: 12px; }
+    strong, .hl { color: var(--text); font-weight: 600; }
+    a { color: var(--accent-blue); text-decoration: none; }
+
+    /* ── Section spacing ── */
+    .section { margin-top: 64px; }
+    .section-label {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.8px;
+      color: var(--accent-cyan); margin-bottom: 12px;
+    }
+    .section-label::before {
+      content: '';
+      width: 24px; height: 1px; background: var(--accent-cyan);
+    }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      border-radius: 28px;
+      padding: 56px 48px 48px;
+      background:
+        radial-gradient(ellipse 60% 50% at 15% 20%, rgba(77,139,255,0.12), transparent),
+        radial-gradient(ellipse 50% 40% at 85% 80%, rgba(56,217,196,0.08), transparent),
+        linear-gradient(160deg, var(--surface-2), var(--surface-1));
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px; right: -200px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(77,139,255,0.06), transparent 60%);
+      pointer-events: none;
+    }
+    .hero-subtitle {
+      font-size: 15px; color: var(--text-dim); max-width: 780px; margin-top: 16px; line-height: 1.7;
+    }
+    .hero-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+      border: 1px solid var(--border);
+    }
+    .pill--blue { background: rgba(77,139,255,0.1); color: #a5c4ff; border-color: rgba(77,139,255,0.25); }
+    .pill--cyan { background: rgba(56,217,196,0.08); color: #7eecd9; border-color: rgba(56,217,196,0.2); }
+    .pill--amber { background: rgba(245,166,35,0.08); color: #ffd07a; border-color: rgba(245,166,35,0.2); }
+    .pill--violet { background: rgba(167,139,250,0.08); color: #c4b5fd; border-color: rgba(167,139,250,0.2); }
+    .pill--rose { background: rgba(242,95,122,0.08); color: #fca5b5; border-color: rgba(242,95,122,0.2); }
+
+    /* ── Cards & Grids ── */
+    .grid { display: grid; gap: 16px; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+    .card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--border-strong); }
+    .card--glow-blue { background: linear-gradient(135deg, var(--surface-2), rgba(77,139,255,0.04)); }
+    .card--glow-cyan { background: linear-gradient(135deg, var(--surface-2), rgba(56,217,196,0.03)); }
+    .card--glow-amber { background: linear-gradient(135deg, var(--surface-2), rgba(245,166,35,0.04)); }
+    .card--glow-rose { background: linear-gradient(135deg, var(--surface-2), rgba(242,95,122,0.03)); }
+    .card--glow-violet { background: linear-gradient(135deg, var(--surface-2), rgba(167,139,250,0.04)); }
+
+    .card-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 14px;
+    }
+    .card-icon--blue { background: rgba(77,139,255,0.12); color: var(--accent-blue); }
+    .card-icon--cyan { background: rgba(56,217,196,0.1); color: var(--accent-cyan); }
+    .card-icon--amber { background: rgba(245,166,35,0.1); color: var(--accent-amber); }
+    .card-icon--rose { background: rgba(242,95,122,0.1); color: var(--accent-rose); }
+    .card-icon--violet { background: rgba(167,139,250,0.1); color: var(--accent-violet); }
+
+    /* ── Architecture diagram ── */
+    .arch-diagram {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      overflow-x: auto;
+    }
+    .arch-row {
+      display: grid; gap: 10px; align-items: stretch;
+    }
+    .arch-row--5 { grid-template-columns: repeat(5, 1fr); min-width: 960px; }
+    .arch-row--6 { grid-template-columns: repeat(6, 1fr); min-width: 960px; }
+    .arch-row--4 { grid-template-columns: repeat(4, 1fr); min-width: 960px; }
+    .arch-box {
+      border-radius: 12px; padding: 16px; min-height: 80px;
+      border: 1px solid var(--border);
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .arch-box strong { font-size: 13px; display: block; margin-bottom: 4px; }
+    .arch-box span { font-size: 11.5px; color: var(--text-dim); line-height: 1.5; }
+
+    .arch-box--blue { background: linear-gradient(180deg, rgba(77,139,255,0.1), rgba(77,139,255,0.02)); }
+    .arch-box--cyan { background: linear-gradient(180deg, rgba(56,217,196,0.1), rgba(56,217,196,0.02)); }
+    .arch-box--amber { background: linear-gradient(180deg, rgba(245,166,35,0.1), rgba(245,166,35,0.02)); }
+    .arch-box--violet { background: linear-gradient(180deg, rgba(167,139,250,0.1), rgba(167,139,250,0.02)); }
+    .arch-box--rose { background: linear-gradient(180deg, rgba(242,95,122,0.08), rgba(242,95,122,0.02)); }
+    .arch-box--surface { background: var(--surface-3); }
+
+    .arch-arrow {
+      text-align: center; padding: 6px 0; font-size: 18px; font-weight: 800;
+      color: var(--accent-cyan); letter-spacing: 3px; opacity: 0.6;
+    }
+    .arch-layer-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;
+      color: var(--text-faint); padding: 8px 0 4px;
+    }
+
+    /* ── Code blocks ── */
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px; line-height: 1.7;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px 24px;
+      overflow-x: auto;
+      color: #c8d3f0;
+    }
+    pre .comment { color: #5c6788; }
+    pre .keyword { color: var(--accent-blue); }
+    pre .string { color: var(--accent-cyan); }
+    pre .fn { color: var(--accent-amber); }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: rgba(77,139,255,0.08);
+      border: 1px solid rgba(77,139,255,0.15);
+      border-radius: 5px;
+      padding: 2px 7px;
+      color: #a5c4ff;
+    }
+
+    /* ── Tables ── */
+    .table-wrap {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: var(--surface-3);
+      padding: 14px 16px;
+      text-align: left;
+      font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 14px 16px;
+      font-size: 13.5px; color: var(--text-dim);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: rgba(255,255,255,0.01); }
+
+    /* ── Lists ── */
+    ul, ol { color: var(--text-dim); padding-left: 20px; margin: 8px 0; }
+    li { margin: 6px 0; font-size: 14px; line-height: 1.6; }
+    li strong { color: var(--text); }
+
+    /* ── Callout ── */
+    .callout {
+      border-left: 3px solid var(--accent-amber);
+      background: rgba(245,166,35,0.04);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 18px 24px;
+      margin: 16px 0;
+    }
+    .callout p { color: var(--text-dim); margin: 0; }
+    .callout strong { color: var(--accent-amber); }
+
+    /* ── Flow steps ── */
+    .flow-step {
+      display: flex; gap: 20px; align-items: flex-start; padding: 16px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .flow-step:last-child { border-bottom: none; }
+    .flow-num {
+      flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700;
+      background: rgba(77,139,255,0.1); color: var(--accent-blue);
+      border: 1px solid rgba(77,139,255,0.2);
+    }
+
+    /* ── Phase timeline ── */
+    .phase {
+      position: relative; padding-left: 32px;
+      border-left: 2px solid var(--border);
+      margin-left: 16px; padding-bottom: 32px;
+    }
+    .phase:last-child { border-left-color: transparent; padding-bottom: 0; }
+    .phase::before {
+      content: '';
+      position: absolute; left: -7px; top: 2px;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--accent-blue);
+      border: 2px solid var(--bg);
+    }
+    .phase--active::before { background: var(--accent-cyan); box-shadow: 0 0 12px var(--accent-cyan); }
+    .phase--future::before { background: var(--text-faint); }
+    .phase-title { font-weight: 700; font-size: 17px; margin-bottom: 6px; }
+    .phase-time { font-size: 12px; color: var(--text-faint); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+
+    /* ── Stat row ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 16px; }
+    .stat {
+      text-align: center; padding: 20px;
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .stat-value { font-size: 32px; font-weight: 800; font-family: 'Playfair Display', serif; }
+    .stat-value--blue { color: var(--accent-blue); }
+    .stat-value--cyan { color: var(--accent-cyan); }
+    .stat-value--amber { color: var(--accent-amber); }
+    .stat-value--violet { color: var(--accent-violet); }
+    .stat-label { font-size: 12px; color: var(--text-faint); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+    /* ── Footer ── */
+    .footer { text-align: center; padding: 40px 0; color: var(--text-faint); font-size: 13px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 36px; }
+      .hero { padding: 36px 24px 32px; }
+      .page { padding: 24px 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ════════════════════ HERO ════════════════════ -->
+  <header class="hero">
+    <div class="hero-pills">
+      <span class="pill pill--blue">AWS Bedrock</span>
+      <span class="pill pill--cyan">LangGraph</span>
+      <span class="pill pill--violet">LangChain</span>
+      <span class="pill pill--amber">OpenSearch</span>
+      <span class="pill pill--rose">Enterprise Scale</span>
+    </div>
+    <h1 style="margin-top: 20px;">
+      Enterprise Support Agent<br/>
+      <span style="color: var(--accent-cyan);">Architecture &amp; Implementation</span>
+    </h1>
+    <p class="hero-subtitle">
+      A production-grade, workflow-driven support agent that answers questions using knowledge bases, business APIs, logs, and operational data.
+      Built on <strong>Amazon Bedrock</strong> for LLM inference and guardrails, <strong>LangGraph</strong> for stateful orchestration,
+      and <strong>LangChain</strong> for tool and retriever integration — designed for multi-tenant enterprise deployment.
+    </p>
+  </header>
+
+  <!-- ════════════════════ DESIGN PRINCIPLES ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Design Principles</div>
+    <div class="grid grid-4">
+      <div class="card card--glow-blue">
+        <div class="card-icon card-icon--blue">⚡</div>
+        <h3>Workflow-Driven</h3>
+        <p>Explicit state machine — not one giant prompt. Routing, retrieval, tool use, and synthesis are separate, testable stages.</p>
+      </div>
+      <div class="card card--glow-cyan">
+        <div class="card-icon card-icon--cyan">🔍</div>
+        <h3>Evidence-Grounded</h3>
+        <p>Every answer cites its source — KB article, API response, or log query. Confidence levels are always surfaced.</p>
+      </div>
+      <div class="card card--glow-amber">
+        <div class="card-icon card-icon--amber">🏢</div>
+        <h3>Multi-Tenant Safe</h3>
+        <p>Tenant isolation at every layer: retrieval filters, tool authorization, data scoping, and guardrail policies.</p>
+      </div>
+      <div class="card card--glow-violet">
+        <div class="card-icon card-icon--violet">📈</div>
+        <h3>Scalable by Design</h3>
+        <p>Stateless compute, checkpointed state, async tool execution, and horizontal scaling across all layers.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ ARCHITECTURE OVERVIEW ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 1</div>
+    <h2>High-Level Architecture</h2>
+    <p>The agent processes each request through a layered pipeline: ingestion → routing → evidence gathering → synthesis → safety → response.</p>
+
+    <div class="arch-diagram" style="margin-top: 20px;">
+
+      <div class="arch-layer-label">Layer 1 — Ingestion &amp; Interface</div>
+      <div class="arch-row arch-row--5">
+        <div class="arch-box arch-box--cyan"><strong>User Channels</strong><span>Web portal, Slack, Teams, mobile app, support console, API clients</span></div>
+        <div class="arch-box arch-box--surface"><strong>API Gateway / ALB</strong><span>Auth, rate limiting, request routing, TLS termination</span></div>
+        <div class="arch-box arch-box--blue"><strong>Request Normalizer</strong><span>Deduplicate, clean, attach tenant &amp; user context, session lookup</span></div>
+        <div class="arch-box arch-box--surface"><strong>Session Manager</strong><span>DynamoDB / Redis — conversation history, thread state</span></div>
+        <div class="arch-box arch-box--violet"><strong>AuthN / AuthZ</strong><span>SSO, IAM, role-based access, tenant scoping</span></div>
+      </div>
+
+      <div class="arch-arrow">▼ ▼ ▼</div>
+
+      <div class="arch-layer-label">Layer 2 — Orchestration (LangGraph State Machine)</div>
+      <div class="arch-row arch-row--5">
+        <div class="arch-box arch-box--cyan"><strong>Intent Router</strong><span>Hybrid: rule engine + LLM classification with confidence thresholds</span></div>
+        <div class="arch-box arch-box--blue"><strong>Entity Extractor</strong><span>Service, env, ticket ID, time window, region, claim ID</span></div>
+        <div class="arch-box arch-box--violet"><strong>Retrieval Planner</strong><span>Decides KB, API, logs, or multi-source strategy</span></div>
+        <div class="arch-box arch-box--blue"><strong>Evidence Ranker</strong><span>Score, dedupe, trim evidence. Optional cross-encoder reranking</span></div>
+        <div class="arch-box arch-box--cyan"><strong>Answer Synthesizer</strong><span>Bedrock LLM — grounded response with citations &amp; next actions</span></div>
+      </div>
+
+      <div class="arch-arrow">▼ ▼ ▼</div>
+
+      <div class="arch-layer-label">Layer 3 — Tool Execution &amp; Data Sources</div>
+      <div class="arch-row arch-row--6">
+        <div class="arch-box arch-box--amber"><strong>OpenSearch / Bedrock KB</strong><span>Runbooks, SOPs, FAQs, incident reviews, release notes</span></div>
+        <div class="arch-box arch-box--amber"><strong>Business APIs</strong><span>Ticket, claim, order, deployment, config, account lookups</span></div>
+        <div class="arch-box arch-box--amber"><strong>Logs &amp; Traces</strong><span>CloudWatch Insights, X-Ray, OpenSearch log indices</span></div>
+        <div class="arch-box arch-box--amber"><strong>Config / Data Stores</strong><span>DynamoDB, Aurora, S3, feature flags, routing rules</span></div>
+        <div class="arch-box arch-box--rose"><strong>Safety Layer</strong><span>Bedrock Guardrails + custom policy engine + PII redaction</span></div>
+        <div class="arch-box arch-box--rose"><strong>Human Handoff</strong><span>Escalation queue, support engineer assist, feedback loop</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ CORE RESPONSIBILITIES ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 2</div>
+    <h2>Core Responsibilities by Layer</h2>
+    <div class="grid grid-2">
+      <div class="card card--glow-blue">
+        <h3>Amazon Bedrock</h3>
+        <ul>
+          <li><strong>LLM inference</strong> — intent classification, entity extraction, retrieval planning, answer synthesis, and structured output generation.</li>
+          <li><strong>Embeddings</strong> — Titan Embeddings for vector search in OpenSearch or Bedrock Knowledge Bases.</li>
+          <li><strong>Guardrails</strong> — content screening, denied-topic enforcement, PII masking, and hallucination grounding checks.</li>
+          <li><strong>Knowledge Bases</strong> (optional) — managed RAG with automatic chunking, indexing, and citation-aware retrieval.</li>
+        </ul>
+      </div>
+      <div class="card card--glow-cyan">
+        <h3>LangGraph / LangChain</h3>
+        <ul>
+          <li><strong>LangGraph</strong> — explicit state graph, conditional routing between nodes, checkpointing, retries, timeouts, and human-in-the-loop breakpoints.</li>
+          <li><strong>LangChain</strong> — model interfaces (<code>ChatBedrock</code>), tool wrappers, retrievers (<code>OpenSearchVectorSearch</code>), structured output parsers, and prompt management.</li>
+          <li><strong>State management</strong> — typed state object flows through the graph; every node reads/writes specific fields.</li>
+          <li><strong>Observability</strong> — LangSmith or OpenTelemetry tracing for every node, tool call, and LLM invocation.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ END-TO-END FLOW ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 3</div>
+    <h2>End-to-End Request Flow</h2>
+    <div class="card">
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div><strong>Normalize &amp; Authenticate</strong><p>Clean input, resolve session, attach tenant context, enforce rate limits. Rewrite ambiguous queries if multi-turn context clarifies intent.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div><strong>Classify Intent</strong><p>Hybrid router: regex/keyword rules fire first for obvious patterns (ticket IDs, deployment refs). LLM-based classification handles ambiguous queries. Returns intent label + confidence score.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div><strong>Extract Entities</strong><p>Pull structured fields: service name, environment, region, time range, ticket/claim/order IDs, user identifiers. These parameterize downstream tool calls.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div><strong>Plan Retrieval Strategy</strong><p>Based on intent + entities, select which data sources to query: KB only, API only, logs only, or multi-source. Set parallel vs. sequential execution order.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div><strong>Execute Tools &amp; Gather Evidence</strong><p>Run typed tool calls against OpenSearch, business APIs, and log query services. Each tool returns normalized evidence with source labels and timestamps.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">6</div>
+        <div><strong>Rank &amp; Trim Evidence</strong><p>Score evidence by relevance, recency, and authority. Optionally apply a cross-encoder reranker. Trim to the top-K most useful pieces to stay within context limits.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">7</div>
+        <div><strong>Synthesize Answer</strong><p>LLM generates a grounded response using only the gathered evidence. Output includes: answer text, confidence level, source citations, and recommended next actions.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">8</div>
+        <div><strong>Apply Guardrails &amp; Policy</strong><p>Bedrock Guardrails screen the response. Custom policy engine checks for unauthorized data disclosure, off-topic drift, or low-confidence situations requiring escalation.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">9</div>
+        <div><strong>Deliver or Escalate</strong><p>Return the response with citations. If confidence is below threshold or the query requires human judgment, route to the escalation queue with all gathered context.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ LANGGRAPH DESIGN ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 4</div>
+    <h2>LangGraph State Machine Design</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>State Object Schema</h3>
+        <pre><span class="comment"># Typed state flows through every node</span>
+{
+  <span class="string">"request_id"</span>: <span class="string">"uuid"</span>,
+  <span class="string">"tenant_id"</span>: <span class="string">"acme-corp"</span>,
+  <span class="string">"user_id"</span>: <span class="string">"u-8291"</span>,
+  <span class="string">"question"</span>: <span class="string">"Why are claim updates delayed?"</span>,
+  <span class="string">"conversation_history"</span>: [],
+  <span class="string">"normalized_question"</span>: <span class="string">"..."</span>,
+  <span class="string">"intent"</span>: <span class="string">"logs_debug"</span>,
+  <span class="string">"intent_confidence"</span>: 0.91,
+  <span class="string">"entities"</span>: {
+    <span class="string">"service"</span>: <span class="string">"claim-update-svc"</span>,
+    <span class="string">"environment"</span>: <span class="string">"prod"</span>,
+    <span class="string">"time_range"</span>: <span class="string">"last_2h"</span>,
+    <span class="string">"region"</span>: <span class="string">"us-east-1"</span>
+  },
+  <span class="string">"retrieval_plan"</span>: [<span class="string">"logs"</span>, <span class="string">"api"</span>, <span class="string">"kb"</span>],
+  <span class="string">"evidence"</span>: [],
+  <span class="string">"answer"</span>: <span class="keyword">null</span>,
+  <span class="string">"confidence"</span>: <span class="keyword">null</span>,
+  <span class="string">"sources"</span>: [],
+  <span class="string">"next_actions"</span>: [],
+  <span class="string">"policy_flags"</span>: [],
+  <span class="string">"needs_handoff"</span>: <span class="keyword">false</span>,
+  <span class="string">"error"</span>: <span class="keyword">null</span>
+}</pre>
+      </div>
+      <div class="card">
+        <h3>Graph Nodes</h3>
+        <ul>
+          <li><code>normalize_request</code> — clean input, resolve session context</li>
+          <li><code>load_user_context</code> — fetch tenant config, permissions, history</li>
+          <li><code>classify_intent</code> — hybrid rule + LLM classification</li>
+          <li><code>extract_entities</code> — structured field extraction</li>
+          <li><code>plan_retrieval</code> — decide sources and execution order</li>
+          <li><code>retrieve_kb</code> — OpenSearch or Bedrock KB vector/hybrid search</li>
+          <li><code>call_support_apis</code> — typed business API tool execution</li>
+          <li><code>query_logs</code> — CloudWatch Insights or OpenSearch log queries</li>
+          <li><code>rank_evidence</code> — relevance scoring and trimming</li>
+          <li><code>synthesize_answer</code> — LLM answer generation with citations</li>
+          <li><code>apply_guardrails</code> — Bedrock Guardrails + custom policy</li>
+          <li><code>handoff_or_finish</code> — deliver answer or escalate</li>
+        </ul>
+        <h3 style="margin-top: 20px;">Conditional Edges</h3>
+        <ul>
+          <li><code>classify_intent</code> → routes to different retrieval paths by intent</li>
+          <li><code>plan_retrieval</code> → fans out to parallel source nodes</li>
+          <li><code>apply_guardrails</code> → branches to finish or handoff based on policy flags</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ INTENT ROUTER ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 5</div>
+    <h2>Intent Router — Detailed Design</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Hybrid Routing Strategy</h3>
+        <p>The router uses a two-pass approach for speed and accuracy:</p>
+        <ul>
+          <li><strong>Pass 1 — Rule engine:</strong> Regex patterns detect ticket IDs (<code>INC-\d+</code>), claim refs, deployment hashes, trace IDs. These map directly to <code>api_lookup</code> or <code>logs_debug</code> intents with high confidence.</li>
+          <li><strong>Pass 2 — LLM classification:</strong> For queries that don't match rules, send to Bedrock with a classification prompt. Returns intent + confidence. If confidence &lt; 0.7, trigger a <code>mixed_investigation</code> path that queries multiple sources.</li>
+          <li><strong>Fallback:</strong> If confidence &lt; 0.4 or intent is <code>unsupported</code>, route to human handoff with the gathered context.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Intent Taxonomy</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Intent</th><th>Description</th><th>Primary Source</th></tr></thead>
+            <tbody>
+              <tr><td><code>docs_kb</code></td><td>How-to, process, SOP, FAQ questions</td><td>OpenSearch / Bedrock KB</td></tr>
+              <tr><td><code>api_lookup</code></td><td>Status checks, account/order/claim info</td><td>Business APIs</td></tr>
+              <tr><td><code>logs_debug</code></td><td>Incident investigation, error analysis</td><td>CloudWatch / Log indices</td></tr>
+              <tr><td><code>mixed_investigation</code></td><td>Complex queries needing multiple sources</td><td>All sources</td></tr>
+              <tr><td><code>general</code></td><td>Greetings, clarifications, meta questions</td><td>LLM only</td></tr>
+              <tr><td><code>unsupported</code></td><td>Out-of-scope, needs human</td><td>Handoff</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top: 16px;">
+      <p><strong>Enterprise tip:</strong> Start with 4–5 intents maximum. Measure misclassification rates with an eval set before adding new intents. Each new intent increases routing complexity and testing burden.</p>
+    </div>
+  </div>
+
+  <!-- ════════════════════ SOURCE-SPECIFIC RETRIEVAL ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 6</div>
+    <h2>Source-Specific Retrieval Strategies</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Source</th><th>Best Used For</th><th>Implementation</th><th>Guardrails</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>OpenSearch / Bedrock KB</strong></td>
+            <td>Runbooks, SOPs, troubleshooting guides, release notes, incident reviews, ticket resolutions, FAQs</td>
+            <td>Hybrid retrieval (BM25 + vector). Chunk at 500–1200 tokens with 10–15% overlap. Enrich chunks with metadata: tenant, product, service, environment, version, updated_at. Use metadata filters at query time.</td>
+            <td>Filter by tenant and data classification. Enforce freshness: deprioritize docs older than configurable threshold. Validate chunk source before including in context.</td>
+          </tr>
+          <tr>
+            <td><strong>Business APIs</strong></td>
+            <td>Live case status, claim details, order tracking, deployment history, configuration state, account info</td>
+            <td>Typed tool wrappers: <code>get_ticket_status(id)</code>, <code>get_claim_details(id)</code>, <code>get_deployments(service, env, hours)</code>. Never expose a generic "call any endpoint" tool.</td>
+            <td>Enforce AuthZ per tool call. Validate parameters against schema. Timeout and retry policies per API. Redact sensitive fields before passing to LLM.</td>
+          </tr>
+          <tr>
+            <td><strong>Logs / Traces</strong></td>
+            <td>Incident root-cause analysis, latency spikes, error rate analysis, blast radius assessment</td>
+            <td>Constrained log query tools backed by CloudWatch Insights or OpenSearch. LLM generates query parameters (not raw queries) that the tool validates and executes.</td>
+            <td>Never send raw log streams to the model. Enforce time-window bounds (max 24h). Redact secrets, tokens, PII from log snippets before model input. Rate-limit expensive queries.</td>
+          </tr>
+          <tr>
+            <td><strong>Config / Data Stores</strong></td>
+            <td>Feature flags, routing rules, environment state, support metadata, customer tier info</td>
+            <td>Narrow read-only tools with caching. Store selected output in agent state for downstream use.</td>
+            <td>No broad reads from model-generated queries. Cache aggressively. Scope by tenant/environment.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════════════ TOOL DESIGN ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 7</div>
+    <h2>Tool Design Principles</h2>
+    <div class="grid grid-3">
+      <div class="card card--glow-blue">
+        <h3>Typed &amp; Narrow</h3>
+        <p>Every tool has an explicit contract with typed inputs and outputs. No generic "execute_api" or "run_query" tools. Each tool maps to one business capability.</p>
+        <pre><span class="comment"># Good</span>
+<span class="fn">get_ticket_status</span>(ticket_id: str)
+<span class="fn">query_error_rate</span>(
+  service: str,
+  env: str,
+  minutes_back: int
+)
+
+<span class="comment"># Bad — too generic</span>
+<span class="fn">call_api</span>(url: str, params: dict)</pre>
+      </div>
+      <div class="card card--glow-cyan">
+        <h3>Normalized Output</h3>
+        <p>Every tool returns a standard evidence envelope: summary, key fields, timestamps, identifiers, and a source label for citation tracking.</p>
+        <pre>{
+  <span class="string">"source"</span>: <span class="string">"api:ticket-service"</span>,
+  <span class="string">"ref"</span>: <span class="string">"INC-20491"</span>,
+  <span class="string">"timestamp"</span>: <span class="string">"2026-03-31T14:22Z"</span>,
+  <span class="string">"summary"</span>: <span class="string">"Ticket open, P2..."</span>,
+  <span class="string">"data"</span>: { ... }
+}</pre>
+      </div>
+      <div class="card card--glow-amber">
+        <h3>Defense in Depth</h3>
+        <p>Tools enforce their own guardrails independent of the orchestrator: parameter validation, AuthZ checks, timeout enforcement, output size limits, and PII redaction before returning data to the LLM.</p>
+        <ul>
+          <li>Max result size per tool: configurable</li>
+          <li>Timeout: 5–30s per tool call</li>
+          <li>Retry policy: exponential backoff, max 2</li>
+          <li>Circuit breaker: fail open with cached data or graceful degradation</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ OPENSEARCH DESIGN ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 8</div>
+    <h2>OpenSearch / Knowledge Base Design</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Indexing Pipeline</h3>
+        <ul>
+          <li><strong>Documents:</strong> SOPs, troubleshooting guides, known-error database, release notes, incident reviews, past ticket resolutions, product documentation.</li>
+          <li><strong>Chunking:</strong> 500–1200 tokens per chunk. 10–15% overlap for procedural documents. Section-aware splitting — don't break mid-procedure.</li>
+          <li><strong>Metadata per chunk:</strong> <code>tenant</code>, <code>product</code>, <code>service</code>, <code>environment</code>, <code>region</code>, <code>doc_type</code>, <code>version</code>, <code>updated_at</code>, <code>author</code>, <code>data_classification</code>.</li>
+          <li><strong>Embeddings:</strong> Amazon Titan Embeddings V2. Batch-generate on ingest, store alongside text in OpenSearch <code>knn_vector</code> field.</li>
+          <li><strong>Refresh strategy:</strong> Event-driven (Confluence webhook → Lambda → reindex) + nightly full sync as safety net.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Retrieval Strategy</h3>
+        <ul>
+          <li><strong>Hybrid search:</strong> Combine BM25 lexical with kNN vector. Weight tuning: start at 60% semantic / 40% lexical, adjust per domain.</li>
+          <li><strong>Metadata pre-filtering:</strong> Always filter by <code>tenant</code>. Add <code>service</code>, <code>environment</code> filters when entities are extracted. Dramatically reduces noise.</li>
+          <li><strong>Top-K retrieval:</strong> Fetch top 15–20 chunks, then rerank to top 5–8 for the synthesis prompt.</li>
+          <li><strong>Reranking (optional):</strong> Use a cross-encoder model or Bedrock reranker for quality-critical deployments.</li>
+          <li><strong>Freshness boost:</strong> Score recently updated documents higher. Critical for fast-moving knowledge like incident runbooks.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ LOG INVESTIGATION ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 9</div>
+    <h2>Log Investigation Pipeline</h2>
+    <div class="callout">
+      <p><strong>Critical rule:</strong> Never send raw log streams to the model. Use the model to derive a constrained query plan, execute the query outside the model, and summarize only the returned evidence.</p>
+    </div>
+    <div class="card" style="margin-top: 16px;">
+      <h3>Example Investigation Flow</h3>
+      <pre><span class="comment">User: "Why did payment retries spike after the 6 PM deploy?"</span>
+
+<span class="keyword">Step 1</span> — Intent: logs_debug
+<span class="keyword">Step 2</span> — Entities: service=payment-svc, env=prod, time_range=last_3h
+<span class="keyword">Step 3</span> — Tool #1: <span class="fn">query_top_exceptions</span>(service, env, minutes=180)
+         → Returns: TimeoutException surged at 18:04 UTC
+<span class="keyword">Step 4</span> — Tool #2: <span class="fn">query_latency_metrics</span>(service, env, percentile=p95)
+         → Returns: p95 jumped from 220ms to 4800ms at 18:03
+<span class="keyword">Step 5</span> — Tool #3: <span class="fn">get_recent_deployments</span>(service, env, hours=4)
+         → Returns: Release v2.14.0 deployed at 17:58 UTC
+<span class="keyword">Step 6</span> — Tool #4: <span class="fn">search_kb</span>("timeout burst after rollout payment")
+         → Returns: Known issue KB-4421 — connection pool exhaustion
+<span class="keyword">Step 7</span> — Synthesis: Likely cause identified + confidence: high
+         → Answer: connection pool not resized for new retry logic
+         → Next actions: rollback or hotfix pool config</pre>
+    </div>
+  </div>
+
+  <!-- ════════════════════ ANSWER CONTRACT ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 10</div>
+    <h2>Answer Contract &amp; Quality Rules</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Response Schema</h3>
+        <pre>{
+  <span class="string">"answer"</span>: <span class="string">"Claim updates delayed due to 
+  ingestion worker backlog after config 
+  change at 18:04 UTC."</span>,
+  <span class="string">"confidence"</span>: <span class="string">"high"</span>,
+  <span class="string">"sources"</span>: [
+    {<span class="string">"type"</span>: <span class="string">"logs"</span>,
+     <span class="string">"ref"</span>: <span class="string">"cw:claim-worker-prod"</span>},
+    {<span class="string">"type"</span>: <span class="string">"api"</span>,
+     <span class="string">"ref"</span>: <span class="string">"deploy-svc:release-8821"</span>},
+    {<span class="string">"type"</span>: <span class="string">"kb"</span>,
+     <span class="string">"ref"</span>: <span class="string">"runbook/claim-backlog"</span>}
+  ],
+  <span class="string">"next_actions"</span>: [
+    <span class="string">"Scale workers or pause batch jobs"</span>,
+    <span class="string">"Monitor queue depth for 15 min"</span>
+  ],
+  <span class="string">"needs_handoff"</span>: <span class="keyword">false</span>,
+  <span class="string">"metadata"</span>: {
+    <span class="string">"latency_ms"</span>: 2340,
+    <span class="string">"tools_called"</span>: 3,
+    <span class="string">"evidence_count"</span>: 7
+  }
+}</pre>
+      </div>
+      <div class="card">
+        <h3>Quality Rules</h3>
+        <ul>
+          <li><strong>No fabricated certainty:</strong> If evidence is partial, say so. Use confidence levels: high, medium, low, insufficient.</li>
+          <li><strong>Separate facts from inferences:</strong> Clearly distinguish "logs show X" from "this likely means Y."</li>
+          <li><strong>Always cite sources:</strong> Every factual claim links to a source type and reference.</li>
+          <li><strong>Actionable next steps:</strong> Don't just diagnose — recommend what to do next.</li>
+          <li><strong>Escalation trigger:</strong> Auto-handoff when confidence &lt; threshold, when the query involves billing/legal, or when the user explicitly asks for a human.</li>
+          <li><strong>Tone consistency:</strong> Professional, concise, empathetic. Match the enterprise's voice guidelines.</li>
+        </ul>
+        <h3 style="margin-top: 20px;">Confidence Thresholds</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Level</th><th>Score</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td>High</td><td>≥ 0.85</td><td>Deliver answer directly</td></tr>
+              <tr><td>Medium</td><td>0.6 – 0.85</td><td>Deliver with caveats</td></tr>
+              <tr><td>Low</td><td>0.4 – 0.6</td><td>Answer + offer escalation</td></tr>
+              <tr><td>Insufficient</td><td>&lt; 0.4</td><td>Auto-escalate to human</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ SECURITY ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 11</div>
+    <h2>Security, Governance &amp; Multi-Tenancy</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Area</th><th>Control</th><th>Implementation</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Authentication</strong></td><td>SSO / IAM / internal identity</td><td>Pass tenant and user claims to the agent before any retrieval or tool use. Validate JWT/SAML tokens at the API layer.</td></tr>
+          <tr><td><strong>Authorization</strong></td><td>Source-level AuthZ</td><td>Restrict tools and retrieval by team, tenant, role, region, and environment. Use IAM policies for AWS service access; application-level RBAC for business APIs.</td></tr>
+          <tr><td><strong>Data Isolation</strong></td><td>Tenant-scoped retrieval</td><td>Every OpenSearch query includes <code>tenant_id</code> filter. API tools pass tenant context. Log queries scoped to tenant's log groups.</td></tr>
+          <tr><td><strong>Content Safety</strong></td><td>Bedrock Guardrails</td><td>Screen prompts and responses. Apply denied topics. Mask PII (SSN, CC numbers, etc.) in both input and output.</td></tr>
+          <tr><td><strong>Secrets</strong></td><td>Secrets Manager / IAM roles</td><td>Never expose credentials in prompts. Use IAM roles for service-to-service auth. Rotate secrets on schedule.</td></tr>
+          <tr><td><strong>Prompt Injection</strong></td><td>Input sanitization</td><td>Escape user input before inclusion in prompts. Use separate system/user message roles. Monitor for injection patterns.</td></tr>
+          <tr><td><strong>Audit Trail</strong></td><td>Full request tracing</td><td>Log: request, intent, entities, tools called, evidence refs, final answer, confidence, latency. Store in immutable audit log (S3 + Athena).</td></tr>
+          <tr><td><strong>Data Retention</strong></td><td>Policy-driven TTL</td><td>Conversation history: 90-day default, configurable per tenant. Audit logs: 1 year minimum. No model training on customer data.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════════════ AWS SERVICE MAP ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 12</div>
+    <h2>AWS Service Mapping</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Capability</th><th>Primary Service</th><th>Alternative</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>LLM Inference</td><td>Amazon Bedrock (Claude)</td><td>Bedrock (Titan, Llama)</td><td>Claude for planning/synthesis; optionally a smaller model for fast classification tasks.</td></tr>
+          <tr><td>Embeddings</td><td>Bedrock Titan Embeddings V2</td><td>Cohere Embed</td><td>Used for vector search in OpenSearch and similarity-based intent routing.</td></tr>
+          <tr><td>Guardrails</td><td>Amazon Bedrock Guardrails</td><td>Custom Lambda filter</td><td>Prompt + response screening, PII masking, denied topics, grounding checks.</td></tr>
+          <tr><td>Knowledge Retrieval</td><td>OpenSearch Service</td><td>Bedrock Knowledge Bases</td><td>Direct OpenSearch for full control; Bedrock KB for managed RAG with citations.</td></tr>
+          <tr><td>Log Analysis</td><td>CloudWatch Logs Insights</td><td>OpenSearch (log indices)</td><td>Wrap queries in constrained tools. Never expose raw query execution.</td></tr>
+          <tr><td>Agent State</td><td>DynamoDB</td><td>ElastiCache (Redis)</td><td>DynamoDB for durable checkpoints; Redis for hot session cache.</td></tr>
+          <tr><td>Compute</td><td>ECS Fargate / Lambda</td><td>EKS</td><td>Fargate for steady-state; Lambda for bursty/event-driven tool execution.</td></tr>
+          <tr><td>API Layer</td><td>API Gateway</td><td>ALB</td><td>API Gateway for REST + auth + throttling; ALB for WebSocket/streaming.</td></tr>
+          <tr><td>Observability</td><td>CloudWatch + X-Ray</td><td>OpenTelemetry + Grafana</td><td>Trace every graph node and tool call. Dashboard per-node latency and error rates.</td></tr>
+          <tr><td>Secrets</td><td>Secrets Manager</td><td>Parameter Store</td><td>Rotate API keys and DB credentials. Never in environment variables or prompts.</td></tr>
+          <tr><td>Audit / Storage</td><td>S3 + Athena</td><td>CloudWatch Logs</td><td>Immutable audit log. Athena for ad-hoc analysis. S3 lifecycle for retention.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ════════════════════ IMPLEMENTATION CODE ════════════════════ -->
+  <div class="section" style="margin-top: 0;">
+    <div class="section-label">Section 13</div>
+    <h2>Implementation — Core Code</h2>
+    <p>Complete, production-oriented Python implementation using LangGraph + LangChain + Bedrock.</p>
+
+    <h3 style="margin-top: 28px;">13.1 — State Definition</h3>
+    <div class="card">
+      <pre><span class="comment"># app/graph/state.py</span>
+<span class="keyword">from</span> typing <span class="keyword">import</span> TypedDict, Literal, Optional
+<span class="keyword">from</span> pydantic <span class="keyword">import</span> BaseModel, Field
+
+<span class="keyword">class</span> <span class="fn">Entity</span>(BaseModel):
+    service: Optional[str] = <span class="keyword">None</span>
+    environment: Optional[str] = <span class="keyword">None</span>
+    region: Optional[str] = <span class="keyword">None</span>
+    time_range: Optional[str] = <span class="keyword">None</span>
+    ticket_id: Optional[str] = <span class="keyword">None</span>
+    claim_id: Optional[str] = <span class="keyword">None</span>
+    deployment_id: Optional[str] = <span class="keyword">None</span>
+
+<span class="keyword">class</span> <span class="fn">Evidence</span>(BaseModel):
+    source_type: str          <span class="comment"># "kb", "api", "logs", "config"</span>
+    source_ref: str           <span class="comment"># "opensearch:support-docs", "api:ticket-svc"</span>
+    content: str
+    relevance_score: float = 0.0
+    timestamp: Optional[str] = <span class="keyword">None</span>
+
+<span class="keyword">class</span> <span class="fn">AgentState</span>(TypedDict):
+    request_id: str
+    tenant_id: str
+    user_id: str
+    question: str
+    conversation_history: list[dict]
+    normalized_question: str
+    intent: str
+    intent_confidence: float
+    entities: Optional[Entity]
+    retrieval_plan: list[str]
+    evidence: list[Evidence]
+    ranked_evidence: list[Evidence]
+    answer: Optional[str]
+    confidence: Optional[str]
+    sources: list[dict]
+    next_actions: list[str]
+    policy_flags: list[str]
+    needs_handoff: bool
+    error: Optional[str]</pre>
+    </div>
+
+    <h3 style="margin-top: 28px;">13.2 — Intent Router Node</h3>
+    <div class="card">
+      <pre><span class="comment"># app/graph/nodes/router.py</span>
+<span class="keyword">import</span> re, json
+<span class="keyword">from</span> langchain_aws <span class="keyword">import</span> ChatBedrock
+<span class="keyword">from</span> langchain.prompts <span class="keyword">import</span> ChatPromptTemplate
+
+llm = ChatBedrock(
+    model_id=<span class="string">"anthropic.claude-3-sonnet-20240229-v1:0"</span>,
+    region_name=<span class="string">"us-east-1"</span>,
+    model_kwargs={<span class="string">"temperature"</span>: 0, <span class="string">"max_tokens"</span>: 256}
+)
+
+<span class="comment"># ── Pass 1: Rule-based fast path ──</span>
+RULE_PATTERNS = {
+    <span class="string">"api_lookup"</span>: [
+        (re.compile(r<span class="string">"INC-\d+"</span>, re.I), 0.95),
+        (re.compile(r<span class="string">"CLM-\d+"</span>, re.I), 0.95),
+        (re.compile(r<span class="string">"ORD-\d+"</span>, re.I), 0.93),
+    ],
+    <span class="string">"logs_debug"</span>: [
+        (re.compile(r<span class="string">"trace[_-]?id"</span>, re.I), 0.90),
+        (re.compile(r<span class="string">"(error|exception|spike|latency|timeout)"</span>, re.I), 0.80),
+    ],
+}
+
+<span class="keyword">def</span> <span class="fn">rule_classify</span>(question: str) -> tuple[str, float] | <span class="keyword">None</span>:
+    <span class="keyword">for</span> intent, patterns <span class="keyword">in</span> RULE_PATTERNS.items():
+        <span class="keyword">for</span> regex, conf <span class="keyword">in</span> patterns:
+            <span class="keyword">if</span> regex.search(question):
+                <span class="keyword">return</span> intent, conf
+    <span class="keyword">return</span> <span class="keyword">None</span>
+
+<span class="comment"># ── Pass 2: LLM classification ──</span>
+CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
+    (<span class="string">"system"</span>, <span class="string">"""Classify the support question into exactly one intent.
+Intents:
+- docs_kb: how-to, process, SOP, FAQ questions
+- api_lookup: status checks, account/order/claim info lookups
+- logs_debug: incident investigation, error/latency analysis
+- mixed_investigation: complex queries needing multiple sources
+- general: greetings, meta questions, clarifications
+- unsupported: out-of-scope, needs human
+
+Return JSON: {"intent": "...", "confidence": 0.0-1.0}
+Return ONLY the JSON, nothing else."""</span>),
+    (<span class="string">"human"</span>, <span class="string">"{question}"</span>)
+])
+
+<span class="keyword">def</span> <span class="fn">classify_intent</span>(state: AgentState) -> dict:
+    question = state[<span class="string">"normalized_question"</span>] or state[<span class="string">"question"</span>]
+
+    <span class="comment"># Try rules first</span>
+    rule_result = rule_classify(question)
+    <span class="keyword">if</span> rule_result:
+        <span class="keyword">return</span> {<span class="string">"intent"</span>: rule_result[0], <span class="string">"intent_confidence"</span>: rule_result[1]}
+
+    <span class="comment"># Fall back to LLM</span>
+    chain = CLASSIFY_PROMPT | llm
+    raw = chain.invoke({<span class="string">"question"</span>: question}).content.strip()
+    parsed = json.loads(raw)
+    <span class="keyword">return</span> {
+        <span class="string">"intent"</span>: parsed[<span class="string">"intent"</span>],
+        <span class="string">"intent_confidence"</span>: parsed[<span class="string">"confidence"</span>]
+    }</pre>
+    </div>
+
+    <h3 style="margin-top: 28px;">13.3 — Entity Extraction Node</h3>
+    <div class="card">
+      <pre><span class="comment"># app/graph/nodes/entities.py</span>
+ENTITY_PROMPT = ChatPromptTemplate.from_messages([
+    (<span class="string">"system"</span>, <span class="string">"""Extract structured entities from this support question.
+Return JSON with these optional fields:
+  service, environment, region, time_range, ticket_id, claim_id, deployment_id
+If a field is not mentioned, omit it.
+Return ONLY valid JSON."""</span>),
+    (<span class="string">"human"</span>, <span class="string">"{question}"</span>)
+])
+
+<span class="keyword">def</span> <span class="fn">extract_entities</span>(state: AgentState) -> dict:
+    chain = ENTITY_PROMPT | llm
+    raw = chain.invoke({<span class="string">"question"</span>: state[<span class="string">"normalized_question"</span>]}).content
+    parsed = json.loads(raw)
+    <span class="keyword">return</span> {<span class="string">"entities"</span>: Entity(**parsed)}</pre>
+    </div>
+
+    <h3 style="margin-top: 28px;">13.4 — OpenSearch Retrieval Node</h3>
+    <div class="card">
+      <pre><span class="comment"># app/graph/nodes/retrieve_kb.py</span>
+<span class="keyword">from</span> opensearchpy <span class="keyword">import</span> OpenSearch
+
+os_client = OpenSearch(
+    hosts=[{<span class="string">"host"</span>: <span class="string">"your-domain.us-east-1.es.amazonaws.com"</span>, <span class="string">"port"</span>: 443}],
+    use_ssl=<span class="keyword">True</span>,
+    http_auth=(<span class="string">"user"</span>, <span class="string">"pass"</span>),  <span class="comment"># or use IAM auth via requests_aws4auth</span>
+)
+
+<span class="keyword">def</span> <span class="fn">retrieve_kb</span>(state: AgentState) -> dict:
+    entities = state.get(<span class="string">"entities"</span>) or Entity()
+    question = state[<span class="string">"normalized_question"</span>]
+
+    <span class="comment"># Build metadata filters</span>
+    filters = [{<span class="string">"term"</span>: {<span class="string">"tenant_id"</span>: state[<span class="string">"tenant_id"</span>]}}]
+    <span class="keyword">if</span> entities.service:
+        filters.append({<span class="string">"term"</span>: {<span class="string">"service"</span>: entities.service}})
+    <span class="keyword">if</span> entities.environment:
+        filters.append({<span class="string">"term"</span>: {<span class="string">"environment"</span>: entities.environment}})
+
+    <span class="comment"># Hybrid search: BM25 + kNN vector</span>
+    body = {
+        <span class="string">"size"</span>: 15,
+        <span class="string">"query"</span>: {
+            <span class="string">"bool"</span>: {
+                <span class="string">"must"</span>: {<span class="string">"match"</span>: {<span class="string">"content"</span>: question}},
+                <span class="string">"filter"</span>: filters
+            }
+        },
+        <span class="string">"knn"</span>: {
+            <span class="string">"embedding"</span>: {
+                <span class="string">"vector"</span>: <span class="fn">get_embedding</span>(question),  <span class="comment"># Titan Embeddings</span>
+                <span class="string">"k"</span>: 15,
+                <span class="string">"filter"</span>: {<span class="string">"bool"</span>: {<span class="string">"must"</span>: filters}}
+            }
+        }
+    }
+    results = os_client.search(index=<span class="string">"support-docs"</span>, body=body)
+    
+    evidence = []
+    <span class="keyword">for</span> hit <span class="keyword">in</span> results[<span class="string">"hits"</span>][<span class="string">"hits"</span>]:
+        evidence.append(Evidence(
+            source_type=<span class="string">"kb"</span>,
+            source_ref=f<span class="string">"opensearch:{hit['_index']}/{hit['_id']}"</span>,
+            content=hit[<span class="string">"_source"</span>][<span class="string">"content"</span>],
+            relevance_score=hit[<span class="string">"_score"</span>],
+            timestamp=hit[<span class="string">"_source"</span>].get(<span class="string">"updated_at"</span>)
+        ))
+    
+    <span class="keyword">return</span> {<span class="string">"evidence"</span>: state[<span class="string">"evidence"</span>] + evidence}</pre>
+    </div>
+
+    <h3 style="margin-top: 28px;">13.5 — Answer Synthesis Node</h3>
+    <div class="card">
+      <pre><span class="comment"># app/graph/nodes/synthesize.py</span>
+SYNTH_PROMPT = ChatPromptTemplate.from_messages([
+    (<span class="string">"system"</span>, <span class="string">"""You are an enterprise support agent. Answer the question 
+using ONLY the evidence provided. Follow these rules:
+
+1. Cite sources using [source_ref] notation
+2. State confidence: high / medium / low / insufficient
+3. Separate facts from inferences
+4. Provide actionable next steps
+5. If evidence is insufficient, say so clearly
+
+Evidence:
+{evidence}
+
+Return JSON:
+{
+  "answer": "...",
+  "confidence": "high|medium|low|insufficient",
+  "sources_used": ["ref1", "ref2"],
+  "next_actions": ["action1", "action2"],
+  "needs_handoff": false
+}"""</span>),
+    (<span class="string">"human"</span>, <span class="string">"{question}"</span>)
+])
+
+<span class="keyword">def</span> <span class="fn">synthesize_answer</span>(state: AgentState) -> dict:
+    evidence_text = <span class="string">"\n\n"</span>.join(
+        f<span class="string">"[{e.source_ref}] {e.content}"</span>
+        <span class="keyword">for</span> e <span class="keyword">in</span> state[<span class="string">"ranked_evidence"</span>]
+    )
+    chain = SYNTH_PROMPT | llm
+    raw = chain.invoke({
+        <span class="string">"evidence"</span>: evidence_text,
+        <span class="string">"question"</span>: state[<span class="string">"normalized_question"</span>]
+    }).content
+    
+    result = json.loads(raw)
+    <span class="keyword">return</span> {
+        <span class="string">"answer"</span>: result[<span class="string">"answer"</span>],
+        <span class="string">"confidence"</span>: result[<span class="string">"confidence"</span>],
+        <span class="string">"sources"</span>: [{<span class="string">"ref"</span>: s} <span class="keyword">for</span> s <span class="keyword">in</span> result[<span class="string">"sources_used"</span>]],
+        <span class="string">"next_actions"</span>: result[<span class="string">"next_actions"</span>],
+        <span class="string">"needs_handoff"</span>: result.get(<span class="string">"needs_handoff"</span>, <span class="keyword">False</span>)
+    }</pre>
+    </div>
+
+    <h3 style="margin-top: 28px;">13.6 — Graph Assembly</h3>
+    <div class="card">
+      <pre><span class="comment"># app/graph/graph.py</span>
+<span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END
+<span class="keyword">from</span> langgraph.checkpoint.memory <span class="keyword">import</span> MemorySaver
+<span class="keyword">from</span> .state <span class="keyword">import</span> AgentState
+<span class="keyword">from</span> .nodes <span class="keyword">import</span> (
+    normalize, router, entities, planner,
+    retrieve_kb, call_apis, query_logs,
+    rank_evidence, synthesize, guardrails, handoff
+)
+
+<span class="keyword">def</span> <span class="fn">build_graph</span>():
+    graph = StateGraph(AgentState)
+
+    <span class="comment"># ── Add nodes ──</span>
+    graph.add_node(<span class="string">"normalize"</span>, normalize.normalize_request)
+    graph.add_node(<span class="string">"classify_intent"</span>, router.classify_intent)
+    graph.add_node(<span class="string">"extract_entities"</span>, entities.extract_entities)
+    graph.add_node(<span class="string">"plan_retrieval"</span>, planner.plan_retrieval)
+    graph.add_node(<span class="string">"retrieve_kb"</span>, retrieve_kb.retrieve_kb)
+    graph.add_node(<span class="string">"call_apis"</span>, call_apis.call_support_apis)
+    graph.add_node(<span class="string">"query_logs"</span>, query_logs.query_logs)
+    graph.add_node(<span class="string">"rank_evidence"</span>, rank_evidence.rank_and_trim)
+    graph.add_node(<span class="string">"synthesize"</span>, synthesize.synthesize_answer)
+    graph.add_node(<span class="string">"guardrails"</span>, guardrails.apply_guardrails)
+    graph.add_node(<span class="string">"handoff"</span>, handoff.handoff_to_human)
+
+    <span class="comment"># ── Linear flow through normalize → classify → extract ──</span>
+    graph.set_entry_point(<span class="string">"normalize"</span>)
+    graph.add_edge(<span class="string">"normalize"</span>, <span class="string">"classify_intent"</span>)
+    graph.add_edge(<span class="string">"classify_intent"</span>, <span class="string">"extract_entities"</span>)
+    graph.add_edge(<span class="string">"extract_entities"</span>, <span class="string">"plan_retrieval"</span>)
+
+    <span class="comment"># ── Conditional: fan out to data sources ──</span>
+    graph.add_conditional_edges(
+        <span class="string">"plan_retrieval"</span>,
+        planner.route_to_sources,
+        {
+            <span class="string">"kb_only"</span>: <span class="string">"retrieve_kb"</span>,
+            <span class="string">"api_only"</span>: <span class="string">"call_apis"</span>,
+            <span class="string">"logs_only"</span>: <span class="string">"query_logs"</span>,
+            <span class="string">"multi"</span>: <span class="string">"retrieve_kb"</span>,  <span class="comment"># starts parallel fan-out</span>
+            <span class="string">"handoff"</span>: <span class="string">"handoff"</span>,
+        }
+    )
+
+    <span class="comment"># ── Converge into ranking → synthesis → guardrails ──</span>
+    graph.add_edge(<span class="string">"retrieve_kb"</span>, <span class="string">"rank_evidence"</span>)
+    graph.add_edge(<span class="string">"call_apis"</span>, <span class="string">"rank_evidence"</span>)
+    graph.add_edge(<span class="string">"query_logs"</span>, <span class="string">"rank_evidence"</span>)
+    graph.add_edge(<span class="string">"rank_evidence"</span>, <span class="string">"synthesize"</span>)
+    graph.add_edge(<span class="string">"synthesize"</span>, <span class="string">"guardrails"</span>)
+
+    <span class="comment"># ── Final: deliver or escalate ──</span>
+    graph.add_conditional_edges(
+        <span class="string">"guardrails"</span>,
+        guardrails.check_policy,
+        {<span class="string">"pass"</span>: END, <span class="string">"fail"</span>: <span class="string">"handoff"</span>}
+    )
+    graph.add_edge(<span class="string">"handoff"</span>, END)
+
+    <span class="comment"># ── Compile with checkpointing ──</span>
+    checkpointer = MemorySaver()  <span class="comment"># swap for DynamoDB saver in prod</span>
+    <span class="keyword">return</span> graph.compile(checkpointer=checkpointer)</pre>
+    </div>
+
+    <h3 style="margin-top: 28px;">13.7 — API Server</h3>
+    <div class="card">
+      <pre><span class="comment"># app/api/server.py</span>
+<span class="keyword">from</span> fastapi <span class="keyword">import</span> FastAPI, Depends
+<span class="keyword">from</span> ..graph.graph <span class="keyword">import</span> build_graph
+<span class="keyword">from</span> ..graph.state <span class="keyword">import</span> AgentState
+<span class="keyword">import</span> uuid
+
+app = FastAPI(title=<span class="string">"Support Agent API"</span>)
+agent = build_graph()
+
+@app.post(<span class="string">"/query"</span>)
+<span class="keyword">async def</span> <span class="fn">handle_query</span>(
+    question: str,
+    tenant_id: str,
+    user_id: str,
+    thread_id: str = <span class="keyword">None</span>
+):
+    thread_id = thread_id or str(uuid.uuid4())
+    
+    initial_state: AgentState = {
+        <span class="string">"request_id"</span>: str(uuid.uuid4()),
+        <span class="string">"tenant_id"</span>: tenant_id,
+        <span class="string">"user_id"</span>: user_id,
+        <span class="string">"question"</span>: question,
+        <span class="string">"conversation_history"</span>: [],
+        <span class="string">"normalized_question"</span>: <span class="string">""</span>,
+        <span class="string">"intent"</span>: <span class="string">""</span>,
+        <span class="string">"intent_confidence"</span>: 0.0,
+        <span class="string">"entities"</span>: <span class="keyword">None</span>,
+        <span class="string">"retrieval_plan"</span>: [],
+        <span class="string">"evidence"</span>: [],
+        <span class="string">"ranked_evidence"</span>: [],
+        <span class="string">"answer"</span>: <span class="keyword">None</span>,
+        <span class="string">"confidence"</span>: <span class="keyword">None</span>,
+        <span class="string">"sources"</span>: [],
+        <span class="string">"next_actions"</span>: [],
+        <span class="string">"policy_flags"</span>: [],
+        <span class="string">"needs_handoff"</span>: <span class="keyword">False</span>,
+        <span class="string">"error"</span>: <span class="keyword">None</span>,
+    }
+    
+    config = {<span class="string">"configurable"</span>: {<span class="string">"thread_id"</span>: thread_id}}
+    result = <span class="keyword">await</span> agent.ainvoke(initial_state, config)
+    
+    <span class="keyword">return</span> {
+        <span class="string">"answer"</span>: result[<span class="string">"answer"</span>],
+        <span class="string">"confidence"</span>: result[<span class="string">"confidence"</span>],
+        <span class="string">"sources"</span>: result[<span class="string">"sources"</span>],
+        <span class="string">"next_actions"</span>: result[<span class="string">"next_actions"</span>],
+        <span class="string">"needs_handoff"</span>: result[<span class="string">"needs_handoff"</span>],
+        <span class="string">"thread_id"</span>: thread_id,
+    }</pre>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ════════════════════ PROJECT STRUCTURE ════════════════════ -->
+  <div class="section" style="margin-top: 0;">
+    <div class="section-label">Section 14</div>
+    <h2>Project Structure</h2>
+    <div class="card">
+      <pre>support-agent/
+├── app/
+│   ├── api/
+│   │   ├── server.py              <span class="comment"># FastAPI application</span>
+│   │   ├── middleware.py          <span class="comment"># Auth, rate limiting, logging</span>
+│   │   └── schemas.py            <span class="comment"># Request/response models</span>
+│   ├── graph/
+│   │   ├── state.py               <span class="comment"># AgentState TypedDict + Pydantic models</span>
+│   │   ├── graph.py               <span class="comment"># LangGraph assembly</span>
+│   │   └── nodes/
+│   │       ├── normalize.py       <span class="comment"># Input cleaning, session resolution</span>
+│   │       ├── router.py          <span class="comment"># Hybrid intent classification</span>
+│   │       ├── entities.py        <span class="comment"># Structured entity extraction</span>
+│   │       ├── planner.py         <span class="comment"># Retrieval strategy selection</span>
+│   │       ├── retrieve_kb.py     <span class="comment"># OpenSearch / Bedrock KB retrieval</span>
+│   │       ├── call_apis.py       <span class="comment"># Business API tool execution</span>
+│   │       ├── query_logs.py      <span class="comment"># CloudWatch / log query tools</span>
+│   │       ├── rank_evidence.py   <span class="comment"># Evidence scoring and trimming</span>
+│   │       ├── synthesize.py      <span class="comment"># LLM answer generation</span>
+│   │       ├── guardrails.py      <span class="comment"># Bedrock Guardrails + custom policy</span>
+│   │       └── handoff.py         <span class="comment"># Human escalation logic</span>
+│   ├── tools/
+│   │   ├── base.py                <span class="comment"># Base tool class with standard envelope</span>
+│   │   ├── tickets.py             <span class="comment"># Ticket lookup (ServiceNow, Jira, etc.)</span>
+│   │   ├── claims.py              <span class="comment"># Claims API wrapper</span>
+│   │   ├── deployments.py         <span class="comment"># Deployment history lookup</span>
+│   │   ├── logs.py                <span class="comment"># CloudWatch Insights query wrapper</span>
+│   │   ├── kb.py                  <span class="comment"># OpenSearch retriever wrapper</span>
+│   │   └── metrics.py             <span class="comment"># CloudWatch Metrics query wrapper</span>
+│   ├── prompts/
+│   │   ├── classify_intent.txt
+│   │   ├── extract_entities.txt
+│   │   ├── plan_retrieval.txt
+│   │   └── synthesize_answer.txt
+│   ├── models/
+│   │   ├── intent.py              <span class="comment"># Intent enum and schemas</span>
+│   │   ├── evidence.py            <span class="comment"># Evidence models</span>
+│   │   └── response.py            <span class="comment"># API response models</span>
+│   └── config/
+│       ├── settings.py            <span class="comment"># Environment config (Pydantic Settings)</span>
+│       ├── policies.yaml          <span class="comment"># Guardrail policies per tenant</span>
+│       └── intents.yaml           <span class="comment"># Intent definitions and routing rules</span>
+├── infra/
+│   ├── terraform/
+│   │   ├── bedrock.tf             <span class="comment"># Model access, guardrails, KB</span>
+│   │   ├── opensearch.tf          <span class="comment"># Domain, indices, access policies</span>
+│   │   ├── dynamodb.tf            <span class="comment"># State/checkpoint tables</span>
+│   │   ├── ecs.tf                 <span class="comment"># Fargate service definition</span>
+│   │   ├── api_gateway.tf         <span class="comment"># REST API, auth, throttling</span>
+│   │   └── iam.tf                 <span class="comment"># Roles, policies, cross-service perms</span>
+│   └── docker/
+│       └── Dockerfile
+├── tests/
+│   ├── unit/                      <span class="comment"># Node-level tests</span>
+│   ├── integration/               <span class="comment"># End-to-end graph tests</span>
+│   └── eval/                      <span class="comment"># Intent accuracy, answer quality evals</span>
+├── scripts/
+│   ├── index_docs.py              <span class="comment"># Bulk indexer for OpenSearch</span>
+│   ├── run_eval.py                <span class="comment"># Evaluation suite runner</span>
+│   └── seed_test_data.py
+├── pyproject.toml
+└── README.md</pre>
+    </div>
+  </div>
+
+  <!-- ════════════════════ OBSERVABILITY ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 15</div>
+    <h2>Observability &amp; Monitoring</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-value stat-value--blue">P95</div><div class="stat-label">End-to-End Latency</div></div>
+      <div class="stat"><div class="stat-value stat-value--cyan">95%</div><div class="stat-label">Intent Accuracy Target</div></div>
+      <div class="stat"><div class="stat-value stat-value--amber">&lt; 5%</div><div class="stat-label">Hallucination Rate</div></div>
+      <div class="stat"><div class="stat-value stat-value--violet">99.5%</div><div class="stat-label">Uptime SLA</div></div>
+    </div>
+    <div class="grid grid-3" style="margin-top: 16px;">
+      <div class="card">
+        <h3>Per-Node Metrics</h3>
+        <ul>
+          <li>Latency per graph node (p50, p95, p99)</li>
+          <li>Tool call success/failure rates</li>
+          <li>LLM token usage per invocation</li>
+          <li>Evidence retrieval count and relevance scores</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Business Metrics</h3>
+        <ul>
+          <li>Intent distribution and misclassification rate</li>
+          <li>Answer confidence distribution</li>
+          <li>Handoff rate and reasons</li>
+          <li>User satisfaction (thumbs up/down, CSAT)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Alerting</h3>
+        <ul>
+          <li>Latency breach &gt; 10s (P95)</li>
+          <li>Error rate &gt; 2% sustained</li>
+          <li>Handoff rate spike &gt; 2x baseline</li>
+          <li>Guardrail block rate anomaly</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ IMPLEMENTATION PHASES ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 16</div>
+    <h2>Implementation Roadmap</h2>
+    <div style="margin-top: 24px;">
+      <div class="phase phase--active">
+        <div class="phase-title">Phase 1 — MVP</div>
+        <div class="phase-time">Weeks 1–4</div>
+        <div class="card">
+          <ul>
+            <li>3 core intents: <code>docs_kb</code>, <code>api_lookup</code>, <code>logs_debug</code></li>
+            <li>5–8 typed tools covering primary support use cases</li>
+            <li>Basic OpenSearch RAG with tenant-filtered retrieval</li>
+            <li>LangGraph with linear flow (no parallel fan-out yet)</li>
+            <li>Simple confidence scoring and source citations</li>
+            <li>Single tenant deployment, limited audience for validation</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-title">Phase 2 — Hardening</div>
+        <div class="phase-time">Weeks 5–8</div>
+        <div class="card">
+          <ul>
+            <li>Full AuthZ integration: role-based tool and data access</li>
+            <li>LangGraph checkpointing with DynamoDB for durability</li>
+            <li>Bedrock Guardrails: content screening, PII masking, denied topics</li>
+            <li>Human handoff with context preservation</li>
+            <li>Observability: per-node tracing, dashboards, alerting</li>
+            <li>Evaluation suite: 200+ test cases for intent + answer quality</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-title">Phase 3 — Scale &amp; Optimize</div>
+        <div class="phase-time">Weeks 9–14</div>
+        <div class="card">
+          <ul>
+            <li>Multi-tenant deployment with tenant-specific policies</li>
+            <li>Reranking and retrieval quality tuning (cross-encoder)</li>
+            <li>Parallel tool execution for <code>mixed_investigation</code></li>
+            <li>Caching hot queries and frequently accessed KB chunks</li>
+            <li>Multi-turn conversation with session-aware context</li>
+            <li>A/B testing framework for prompt and retrieval experiments</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase phase--future">
+        <div class="phase-title">Phase 4 — Advanced</div>
+        <div class="phase-time">Weeks 15+</div>
+        <div class="card">
+          <ul>
+            <li>Proactive support: detect issues from logs/metrics before users report</li>
+            <li>Feedback loop: use thumbs-up/down to fine-tune retrieval ranking</li>
+            <li>Custom model fine-tuning for domain-specific classification</li>
+            <li>AgentCore Runtime for managed AWS deployment (optional)</li>
+            <li>Self-service tool onboarding for new business APIs</li>
+            <li>Multi-language support with translation layer</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ AGENTCORE RUNTIME ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 17</div>
+    <h2>Optional: Amazon Bedrock AgentCore Runtime</h2>
+    <div class="grid grid-2">
+      <div class="card card--glow-cyan">
+        <h3>Use AgentCore Runtime When</h3>
+        <ul>
+          <li>You want AWS-managed runtime instead of operating ECS/EKS</li>
+          <li>You need secure VPC access to internal APIs and data</li>
+          <li>You want built-in session management and scaling</li>
+          <li>You're moving from prototype to production quickly on AWS</li>
+        </ul>
+      </div>
+      <div class="card card--glow-amber">
+        <h3>Skip It Initially When</h3>
+        <ul>
+          <li>You're still iterating on graph design and tool contracts</li>
+          <li>You already have container infrastructure and CI/CD</li>
+          <li>You want to validate workflow quality before optimizing hosting</li>
+          <li>You need capabilities not yet supported by the runtime</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout" style="margin-top: 16px;">
+      <p><strong>Recommendation:</strong> AgentCore Runtime is a hosting shell — it does <em>not</em> replace your LangGraph design, tools, or retrieval logic. Start with Bedrock + LangGraph + your own compute. Add AgentCore when you're ready to optimize operations.</p>
+    </div>
+  </div>
+
+  <!-- ════════════════════ COST ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 18</div>
+    <h2>Cost Optimization Strategies</h2>
+    <div class="grid grid-3">
+      <div class="card">
+        <h3>Model Tiering</h3>
+        <p>Use a smaller/cheaper model (Haiku, Titan Lite) for intent classification and entity extraction. Reserve the larger model (Claude Sonnet/Opus) for answer synthesis only. This can reduce LLM costs by 40–60%.</p>
+      </div>
+      <div class="card">
+        <h3>Caching Layers</h3>
+        <p>Cache OpenSearch results for identical queries (Redis, 5–15 min TTL). Cache API tool responses for stable data (ticket status doesn't change every second). Use Bedrock prompt caching for repeated system prompts.</p>
+      </div>
+      <div class="card">
+        <h3>Smart Routing</h3>
+        <p>Short-circuit obvious queries with the rule-based router — no LLM call needed. For FAQ-style questions with high semantic similarity to cached answers, return cached responses directly.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ TESTING ════════════════════ -->
+  <div class="section">
+    <div class="section-label">Section 19</div>
+    <h2>Testing &amp; Evaluation Framework</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Unit Tests (Per Node)</h3>
+        <ul>
+          <li><strong>Intent router:</strong> 100+ labeled queries → expected intent + confidence range</li>
+          <li><strong>Entity extraction:</strong> 50+ queries → expected entity fields</li>
+          <li><strong>Tool wrappers:</strong> Mock API responses, verify parameter validation, output normalization, error handling</li>
+          <li><strong>Synthesis:</strong> Given fixed evidence, verify answer quality, citation accuracy, confidence calibration</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>End-to-End Evaluation</h3>
+        <ul>
+          <li><strong>Golden dataset:</strong> 200+ question → expected answer pairs covering all intents</li>
+          <li><strong>Metrics:</strong> Intent accuracy, entity F1, answer relevance (LLM-as-judge), citation precision, latency P95</li>
+          <li><strong>Regression:</strong> Run eval suite on every PR. Block deployment if metrics drop below threshold.</li>
+          <li><strong>Shadow mode:</strong> Run new versions alongside production, compare outputs before cutover.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ FOOTER ════════════════════ -->
+  <div class="footer">
+    Enterprise Support Agent — Architecture &amp; Implementation Guide<br/>
+    AWS Bedrock · LangGraph · LangChain · OpenSearch<br/>
+    <span style="color: var(--text-faint);">Prepared as an implementation-ready reference for scalable enterprise deployment.</span>
+  </div>
+
+</div>
+</body>
+</html>
