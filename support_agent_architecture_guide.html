@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support Agent Architecture and Implementation Guide</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #4b5563;
+      --line: #d1d5db;
+      --accent: #1d4ed8;
+      --accent-soft: #dbeafe;
+      --code-bg: #0f172a;
+      --code-text: #e5e7eb;
+      --ok: #065f46;
+      --warn: #92400e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+    .hero {
+      background: linear-gradient(135deg, #e0ecff 0%, #ffffff 100%);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    h1, h2, h3 {
+      line-height: 1.25;
+      margin-top: 0;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 1.4rem;
+      margin: 28px 0 12px;
+      border-bottom: 2px solid var(--accent-soft);
+      padding-bottom: 6px;
+    }
+    h3 {
+      font-size: 1.05rem;
+      margin: 20px 0 8px;
+    }
+    p {
+      margin: 10px 0;
+    }
+    .lead {
+      font-size: 1.05rem;
+      color: var(--muted);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 18px 16px;
+      margin: 14px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      margin: 14px 0;
+    }
+    .pill {
+      display: inline-block;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    ul, ol {
+      margin: 8px 0 12px 22px;
+    }
+    li {
+      margin: 6px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eff6ff;
+      color: #1e3a8a;
+      font-weight: 700;
+    }
+    code {
+      background: #eef2ff;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 0.95em;
+    }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-text);
+      padding: 16px;
+      border-radius: 12px;
+      overflow-x: auto;
+      border: 1px solid #1e293b;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .note {
+      border-left: 5px solid var(--accent);
+      background: #eff6ff;
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin: 12px 0;
+    }
+    .ok {
+      border-left-color: #10b981;
+      background: #ecfdf5;
+      color: var(--ok);
+    }
+    .warn {
+      border-left-color: #f59e0b;
+      background: #fffbeb;
+      color: var(--warn);
+    }
+    .footer {
+      margin-top: 36px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <div class="pill">Architecture Guide</div>
+      <h1>Support Agent Architecture and Implementation Guide</h1>
+      <p class="lead">
+        A detailed design for a support agent that knows what questions to ask, when to use documentation,
+        when to call APIs, how to gather evidence, and how to decide what action can be taken.
+      </p>
+      <div class="note">
+        Build this as a <strong>triage + investigation + resolution</strong> system, not just a chatbot.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>1. Core Idea</h2>
+      <p>The agent should follow this sequence:</p>
+      <ol>
+        <li>Understand what kind of issue the customer is facing.</li>
+        <li>Determine what information is missing.</li>
+        <li>Ask only the minimum next question needed.</li>
+        <li>Gather evidence from documentation, APIs, logs, ticket history, and configuration sources.</li>
+        <li>Reason over the evidence and decide the likely cause, recommended steps, and whether an action or escalation is needed.</li>
+        <li>Respond in a structured support format.</li>
+      </ol>
+      <div class="note ok">
+        The support agent is best thought of as an <strong>issue-handling workflow engine with LLM reasoning on top</strong>.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. Issue Handling States</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>State</th>
+            <th>Purpose</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Intake</strong></td>
+            <td>Capture the customer problem in natural language.</td>
+            <td>"My deployment failed", "Repo was not created", "Why is onboarding stuck?"</td>
+          </tr>
+          <tr>
+            <td><strong>Issue Classification</strong></td>
+            <td>Map the problem to an issue family and subtype.</td>
+            <td>Pipeline failure, onboarding issue, release issue, permissions issue</td>
+          </tr>
+          <tr>
+            <td><strong>Missing Info Detection</strong></td>
+            <td>Identify required fields before investigation can continue.</td>
+            <td>Environment, component name, request ID, pipeline run ID</td>
+          </tr>
+          <tr>
+            <td><strong>Evidence Collection</strong></td>
+            <td>Use docs, APIs, logs, and monitoring to gather facts.</td>
+            <td>Query pipeline API, fetch logs, search KB articles</td>
+          </tr>
+          <tr>
+            <td><strong>Reasoning and Decision</strong></td>
+            <td>Determine cause, confidence, safe next step, and whether escalation is needed.</td>
+            <td>Known policy gate failure with high confidence</td>
+          </tr>
+          <tr>
+            <td><strong>Response Generation</strong></td>
+            <td>Return summary, findings, likely cause, actions, and next steps.</td>
+            <td>Explain root cause and give the exact remediation steps</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>3. Recommended Logical Architecture</h2>
+      <pre>Customer / Support User
+  -> Support UI / Chat
+    -> Conversation Orchestrator
+      -> Issue Router
+      -> Slot Filler / Question Planner
+      -> Investigation Planner
+      -> Tool Executor
+          -> Docs Search
+          -> Product APIs
+          -> Logs / Metrics APIs
+          -> Ticketing APIs
+          -> Action APIs
+      -> Policy / Guardrail Engine
+      -> Answer Composer
+    -> Structured Response</pre>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Conversation Orchestrator</h3>
+          <p>Owns session state, controls flow, stores case context, and decides the next step.</p>
+        </div>
+        <div class="card">
+          <h3>Issue Router</h3>
+          <p>Classifies issue type and subtype from customer language and conversation context.</p>
+        </div>
+        <div class="card">
+          <h3>Slot Filler / Question Planner</h3>
+          <p>Tracks missing fields and asks the next highest-value question instead of asking everything at once.</p>
+        </div>
+        <div class="card">
+          <h3>Investigation Planner</h3>
+          <p>Chooses tools and defines the sequence of lookups needed to diagnose the issue.</p>
+        </div>
+        <div class="card">
+          <h3>Tool Executor</h3>
+          <p>Provides a controlled layer for docs search, APIs, logs, tickets, and action calls.</p>
+        </div>
+        <div class="card">
+          <h3>Policy / Guardrail Engine</h3>
+          <p>Controls permissions, evidence requirements, escalation conditions, and safety of actions.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Three-Layer Brain Design</h2>
+
+      <h3>Layer 1: Intent / Issue Router</h3>
+      <p>Identifies the issue category, subtype, urgency, missing fields, and candidate tools.</p>
+      <pre>{
+  "issue_category": "pipeline_failure",
+  "subcategory": "build_error",
+  "urgency": "medium",
+  "needs_clarification": true,
+  "missing_fields": ["component_name", "pipeline_run_id", "environment"],
+  "suggested_sources": ["pipeline_api", "build_logs_api", "kb_ci_cd"]
+}</pre>
+
+      <h3>Layer 2: Slot Filling / Question Planner</h3>
+      <p>This layer decides what to ask next. It should be config-driven, not invented fresh every time by the model.</p>
+      <pre>{
+  "issue_type": "pipeline_failure",
+  "required_fields": [
+    "component_name",
+    "environment"
+  ],
+  "optional_fields": [
+    "pipeline_run_id",
+    "branch",
+    "error_message",
+    "timestamp"
+  ],
+  "question_priority": [
+    "component_name",
+    "environment",
+    "pipeline_run_id",
+    "error_message"
+  ],
+  "tool_dependencies": {
+    "pipeline_api": ["component_name", "environment"],
+    "build_logs_api": ["pipeline_run_id"]
+  },
+  "stop_when": [
+    "enough_context_for_pipeline_lookup",
+    "user_declines_more_details"
+  ]
+}</pre>
+
+      <h3>Layer 3: Investigation / Action Planner</h3>
+      <p>Once enough context is available, choose tools in order, correlate evidence, and decide safe next steps.</p>
+      <ol>
+        <li>Call pipeline status API.</li>
+        <li>Fetch latest failed stage.</li>
+        <li>Fetch stage logs.</li>
+        <li>Retrieve KB articles matching the failure signature.</li>
+        <li>Correlate with recent config or policy changes.</li>
+        <li>Generate probable cause and recommended action.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>5. Use Issue Playbooks Instead of Raw Prompting</h2>
+      <p>Each issue family should have a playbook that defines symptoms, required inputs, data sources, rules, allowed actions, and escalation conditions.</p>
+      <pre>issue_type: release_issue
+symptoms:
+  - "release failed"
+  - "cannot promote"
+  - "approval blocked"
+required_inputs:
+  - app_name
+  - environment
+optional_inputs:
+  - release_id
+  - approver_group
+tools:
+  - release_api
+  - approval_api
+  - environment_status_api
+knowledge_sources:
+  - release_runbook
+  - approval_policy_doc
+decision_rules:
+  - if approval status is pending -> explain approver requirement
+  - if artifact missing -> direct to pipeline artifact validation
+  - if policy gate failed -> show failed policy and remediation
+allowed_actions:
+  - retry_check
+  - draft_ticket
+  - generate_runbook_steps
+escalation:
+  - if production blocked and no safe self-service action exists</pre>
+
+      <div class="note">
+        Playbooks make the system reliable, testable, auditable, and much easier to scale.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>6. Data Source Categories</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Used For</th>
+            <th>Examples</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Static Knowledge</strong></td>
+            <td>How-to questions, SOPs, policies, architecture docs, FAQs</td>
+            <td>Confluence, markdown docs, PDFs, internal KB</td>
+          </tr>
+          <tr>
+            <td><strong>Operational System Context</strong></td>
+            <td>Current status, workflow progress, provisioning state, release or deployment status</td>
+            <td>Onboarding API, pipeline API, release API, GitHub API, AppConfig API</td>
+          </tr>
+          <tr>
+            <td><strong>Observability Data</strong></td>
+            <td>Logs, metrics, traces, alerts, incidents</td>
+            <td>CloudWatch, Datadog, Splunk, OpenSearch</td>
+          </tr>
+          <tr>
+            <td><strong>Action Systems</strong></td>
+            <td>Retries, ticket creation, notifications, remediation workflows</td>
+            <td>Jira, ServiceNow, workflow engines, runbook automation APIs</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>7. Decision Logic: Ask User vs Docs vs API</h2>
+      <h3>Ask the user when</h3>
+      <ul>
+        <li>Required identifiers are missing.</li>
+        <li>The symptom maps to multiple possible issue families.</li>
+        <li>Live lookup requires a request ID, component name, or environment.</li>
+        <li>The available evidence is insufficient for a safe conclusion.</li>
+      </ul>
+
+      <h3>Use docs when</h3>
+      <ul>
+        <li>The user is asking how something works.</li>
+        <li>The question is process or policy oriented.</li>
+        <li>A known error signature maps directly to a documented runbook.</li>
+      </ul>
+
+      <h3>Use APIs when</h3>
+      <ul>
+        <li>The question depends on current system state.</li>
+        <li>The issue is about a real failure or a current incident.</li>
+        <li>You need tenant, app, environment, pipeline, release, or provisioning status.</li>
+      </ul>
+
+      <h3>Use both when</h3>
+      <ul>
+        <li>You diagnose from APIs or logs and explain the fix from docs or runbooks.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>8. Case Context Object</h2>
+      <p>Every support conversation should build and update a structured case context.</p>
+      <pre>{
+  "case_id": "CASE-12345",
+  "issue_type": "onboarding_issue",
+  "subcategory": "repo_not_created",
+  "customer": "TenantA",
+  "app_name": "claims-service",
+  "environment": "dev",
+  "request_id": "ONB-9981",
+  "symptoms": [
+    "repo missing after onboarding"
+  ],
+  "collected_facts": [
+    "onboarding submitted at 2026-04-11T10:15:00Z",
+    "infra completed",
+    "repo creation step failed"
+  ],
+  "missing_fields": [],
+  "tool_results": {
+    "onboarding_api": "...",
+    "github_provisioning_api": "..."
+  },
+  "likely_cause": "GitHub org permission mapping missing",
+  "recommended_actions": [
+    "re-run repo provisioning",
+    "validate GitHub team mapping"
+  ],
+  "confidence": 0.87,
+  "escalation_needed": false
+}</pre>
+      <div class="note ok">
+        This object is the backbone for consistency, observability, replay, testing, and audit.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>9. Config-Driven Questioning Model</h2>
+      <p>Do not hardcode all conversational behavior in prompts. Store issue metadata and question logic as configuration.</p>
+      <pre>{
+  "issue_catalog": [
+    {
+      "issue_type": "onboarding_issue",
+      "match_terms": ["onboarding", "setup", "provision", "repo not created"],
+      "required_fields": ["app_name", "component_type"],
+      "optional_fields": ["request_id", "tenant_id", "environment"],
+      "questions": {
+        "app_name": "Which application or component are you onboarding?",
+        "component_type": "Is this a microservice, UI app, batch job, or something else?",
+        "request_id": "Do you have the onboarding request ID?"
+      },
+      "tool_preconditions": {
+        "onboarding_api": ["app_name"],
+        "repo_api": ["app_name"]
+      }
+    }
+  ]
+}</pre>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th>Why It Matters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Required fields</td>
+            <td>Prevents investigation from starting with missing identifiers</td>
+          </tr>
+          <tr>
+            <td>Question priority</td>
+            <td>Ensures the agent asks only the most valuable next question</td>
+          </tr>
+          <tr>
+            <td>Tool preconditions</td>
+            <td>Prevents invalid or premature API calls</td>
+          </tr>
+          <tr>
+            <td>Stop conditions</td>
+            <td>Controls when the agent should stop asking and start investigating</td>
+          </tr>
+          <tr>
+            <td>Match terms and symptoms</td>
+            <td>Improves classification and fallback matching</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>10. Orchestration Flow</h2>
+      <ol>
+        <li>Classify the issue.</li>
+        <li>Load the matching playbook or issue definition.</li>
+        <li>Compare case context against required fields.</li>
+        <li>Ask one targeted follow-up question if needed.</li>
+        <li>When minimum fields are collected, call the relevant APIs and systems.</li>
+        <li>Search docs or runbooks using failure signatures and live evidence.</li>
+        <li>Generate summary, findings, likely cause, and recommendations.</li>
+        <li>Offer a safe action or escalate if needed.</li>
+      </ol>
+      <pre>User: "My stage release is blocked"
+
+Agent:
+1. Ask: "Which application or service is this for?"
+2. Ask: "Is this for dev, stage, or prod release flow?"
+3. Call release API, approval API, and policy gate API
+4. Detect that artifact signing policy failed
+5. Search runbook for the exact policy failure
+6. Return likely cause, remediation steps, and confidence</pre>
+    </section>
+
+    <section class="card">
+      <h2>11. Tool Registry Design</h2>
+      <p>Each tool should be typed, declared, permissioned, and self-describing.</p>
+      <pre>{
+  "tool_name": "pipeline_status_api",
+  "purpose": "Get latest pipeline run status",
+  "required_inputs": ["component_name", "environment"],
+  "mode": "read",
+  "risk": "low"
+}</pre>
+
+      <pre>{
+  "tool_name": "retry_repo_provisioning",
+  "purpose": "Retry failed repo provisioning",
+  "required_inputs": ["request_id"],
+  "mode": "write",
+  "risk": "medium",
+  "approval_required": true
+}</pre>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>purpose</code></td>
+            <td>Explains what the tool is for</td>
+          </tr>
+          <tr>
+            <td><code>required_inputs</code></td>
+            <td>Used by the question planner and validator</td>
+          </tr>
+          <tr>
+            <td><code>mode</code></td>
+            <td>Distinguishes read-only from action-taking tools</td>
+          </tr>
+          <tr>
+            <td><code>risk</code></td>
+            <td>Used by policy engine and approval flow</td>
+          </tr>
+          <tr>
+            <td><code>approval_required</code></td>
+            <td>Prevents unsafe automatic actions</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>12. Standard Response Format</h2>
+      <p>Do not return only a large paragraph. Use a support-oriented structured format.</p>
+      <pre>What I found
+The onboarding request for claims-service completed infrastructure setup, but the GitHub repository creation step failed.
+
+Likely cause
+The GitHub team mapping for this tenant appears to be missing, which blocked repo provisioning.
+
+What you can do now
+Validate the team mapping in onboarding settings and retry provisioning.
+
+Recommended next step
+I can help by checking the onboarding request details or generating the exact remediation steps.
+
+Confidence
+High</pre>
+    </section>
+
+    <section class="card">
+      <h2>13. Action and Escalation Decisioning</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Outcome Type</th>
+            <th>When to Use</th>
+            <th>Examples</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Self-Service Answer</strong></td>
+            <td>User can resolve the issue with clear instructions</td>
+            <td>Known policy gate fix, access request steps, onboarding documentation</td>
+          </tr>
+          <tr>
+            <td><strong>Assisted Support Action</strong></td>
+            <td>Agent can safely trigger or prepare an action</td>
+            <td>Retry lookup, rerun validation, draft ticket, notify team</td>
+          </tr>
+          <tr>
+            <td><strong>Human Escalation</strong></td>
+            <td>Confidence is low, action is risky, or prod issue needs manual handling</td>
+            <td>Conflicting evidence, production outage, missing permissions, unknown failure</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>When escalating, the agent should generate a complete summary:</p>
+      <ul>
+        <li>Issue type and customer problem statement</li>
+        <li>Identifiers such as tenant, app, environment, run ID, request ID</li>
+        <li>Evidence already collected</li>
+        <li>Likely cause and confidence</li>
+        <li>Actions already attempted</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>14. Guardrails</h2>
+      <ul>
+        <li><strong>Evidence-first rule:</strong> never claim a root cause without evidence from tools or runbooks.</li>
+        <li><strong>Action safety rule:</strong> no write action unless policy, role, and confidence checks all pass.</li>
+        <li><strong>Clarification threshold:</strong> ask when required fields are missing instead of guessing.</li>
+        <li><strong>Evidence traceability:</strong> store which tool or doc produced each fact.</li>
+        <li><strong>Confidence scoring:</strong> compute confidence from data completeness, source agreement, and issue-match quality.</li>
+      </ul>
+      <div class="note warn">
+        The most dangerous failure mode is confident hallucination about a live operational issue. Keep the system evidence-driven.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>15. Suggested Implementation Stack</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Suggested Option</th>
+            <th>Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Workflow orchestration</td>
+            <td>LangGraph or equivalent state-machine framework</td>
+            <td>Fits multi-step conversational support flows</td>
+          </tr>
+          <tr>
+            <td>Docs retrieval</td>
+            <td>Hybrid search with keyword + vector retrieval</td>
+            <td>Better recall for runbooks, FAQs, and error signatures</td>
+          </tr>
+          <tr>
+            <td>Case state store</td>
+            <td>DynamoDB or Postgres</td>
+            <td>Stores session context, case object, traces, and outcomes</td>
+          </tr>
+          <tr>
+            <td>Tool integration layer</td>
+            <td>Typed API wrappers</td>
+            <td>Makes validation, retry, logging, and permissions cleaner</td>
+          </tr>
+          <tr>
+            <td>Policy engine</td>
+            <td>Rule-based or policy-driven decision layer</td>
+            <td>Controls action safety and escalation rules</td>
+          </tr>
+          <tr>
+            <td>Observability</td>
+            <td>End-to-end traces for reasoning and tool use</td>
+            <td>Required for audit and debugging</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>16. Recommended MVP</h2>
+      <h3>Start with these issue types</h3>
+      <ul>
+        <li>Onboarding issue</li>
+        <li>Pipeline failure</li>
+        <li>Release issue</li>
+        <li>Access / permission issue</li>
+      </ul>
+
+      <h3>MVP capabilities</h3>
+      <ul>
+        <li>Issue classification</li>
+        <li>Missing-field detection</li>
+        <li>Single-question stepwise clarification</li>
+        <li>Docs search</li>
+        <li>3 to 5 read-only API integrations</li>
+        <li>Structured answer generation</li>
+        <li>Escalation summary generation</li>
+      </ul>
+
+      <h3>Delay these until later</h3>
+      <ul>
+        <li>Too many issue categories</li>
+        <li>Broad unrestricted tool use</li>
+        <li>Autonomous write actions in production</li>
+        <li>Complex multi-agent behavior before core flow works</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>17. Example End-to-End Interaction</h2>
+      <pre>User: "My stage release is blocked"
+
+Agent: "Which application or service is this for?"
+User: "claims-api"
+
+Agent: "Is this in dev, stage, or prod?"
+User: "stage"
+
+Agent actions:
+- Call release API
+- Call approval API
+- Call policy gate API
+- Detect artifact signing failure
+- Search runbook for signing failure
+
+Response:
+What I found:
+The release exists and approval is complete, but promotion to stage is blocked by the artifact-signing policy gate.
+
+Likely cause:
+The artifact produced by the pipeline is missing the required signature.
+
+What you can do now:
+Check the signing stage of the build pipeline and verify that the artifact signing job completed successfully.
+
+Recommended next step:
+I can generate the exact remediation checklist or prepare an escalation summary.
+
+Confidence:
+High</pre>
+    </section>
+
+    <section class="card">
+      <h2>18. What to Define Before Coding</h2>
+      <ul>
+        <li>Issue taxonomy</li>
+        <li>Issue playbook schema</li>
+        <li>Question / slot schema</li>
+        <li>Tool registry schema</li>
+        <li>Case context schema</li>
+        <li>Response template schema</li>
+        <li>Action policy matrix</li>
+        <li>Escalation policy matrix</li>
+      </ul>
+      <div class="note ok">
+        These artifacts matter more than coding the first prompt. They determine system reliability.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>19. Final Design Principle</h2>
+      <p><strong>Do not build "an LLM that answers support questions."</strong></p>
+      <p><strong>Build a support case orchestrator that uses an LLM for classification, questioning, reasoning, and explanation.</strong></p>
+      <p>That difference is what makes the system operationally useful.</p>
+    </section>
+
+    <p class="footer">
+      Generated as a ready-to-share HTML document. You can open this file in any browser and extend it with diagrams or branding later.
+    </p>
+  </div>
+</body>
+</html>
