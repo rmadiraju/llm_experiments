@@ -28,6 +28,9 @@ The core idea is a **three-tier rule system** that stacks on top of the standard
 └─────────────────────────────────────────────────┘
 ```
 
+<img width="583" height="664" alt="image" src="https://github.com/user-attachments/assets/8376cac9-0be1-4eaf-a975-33688a0fe3eb" />
+
+
 ### 1.2 Portable File Structure
 
 All rules live in the repository. Each IDE maps them to its native rules location via symlinks or copy scripts:
