@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TFS AI-DLC 2029 — A Long-Term Vision</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F7F6F2; --ink:#17181C; --red:#C8102E; --steel:#5B6470;
+    --line:#DBD9D1; --panel:#17181C; --panel-ink:#F0EEE8; --soft:#EFEDE6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:0 28px}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--red)}
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif;line-height:1.12;letter-spacing:-.015em}
+  h2{font-size:clamp(26px,3.4vw,36px);margin:10px 0 18px}
+  h3{font-size:19px;margin:26px 0 8px}
+  p{max-width:76ch;color:#26272C}
+  p+p{margin-top:12px}
+  section{padding:72px 0;border-top:1px solid var(--line)}
+  .secnum{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--steel);letter-spacing:.12em}
+
+  /* Hero */
+  header.hero{padding:84px 0 64px;border-top:6px solid var(--red)}
+  .hero h1{font-size:clamp(38px,6vw,64px);font-weight:700;margin:14px 0 10px}
+  .hero h1 .accent{color:var(--red)}
+  .hero .sub{font-size:clamp(17px,2vw,20px);color:var(--steel);max-width:64ch}
+  .hero .meta{margin-top:28px;display:flex;gap:26px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--steel)}
+  .hero .meta b{color:var(--ink);font-weight:500}
+  .thesis{margin-top:40px;padding:22px 26px;background:var(--soft);border-left:3px solid var(--red);max-width:78ch}
+  .thesis p{font-size:17px;color:var(--ink)}
+
+  /* Planes strata — signature element */
+  .strata{display:flex;flex-direction:column;gap:0;margin-top:34px;border:1px solid var(--ink)}
+  .stratum{display:grid;grid-template-columns:190px 1fr 1fr;border-bottom:1px solid var(--ink);background:#FBFAF7;transition:background .25s ease}
+  .stratum:last-child{border-bottom:none}
+  .stratum:hover{background:#fff}
+  .stratum .name{padding:20px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:6px;justify-content:center}
+  .stratum .name .t{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px}
+  .stratum .name .d{font-size:12.5px;color:var(--steel);line-height:1.45}
+  .stratum .col{padding:20px;font-size:13.5px;line-height:1.55;color:#33343A}
+  .stratum .col:first-of-type{border-right:1px dashed var(--line)}
+  .stratum .col .lbl{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--steel);display:block;margin-bottom:6px}
+  .stratum.hot .name .t{color:var(--red)}
+  .strata-caption{margin-top:12px;font-size:13px;color:var(--steel);max-width:78ch}
+  .strata-head{display:grid;grid-template-columns:190px 1fr 1fr;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--steel);padding:0 0 8px}
+  .strata-head span{padding:0 20px}
+
+  /* Funnel */
+  .funnel{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0 10px}
+  .stage{border:1px solid var(--line);background:#FBFAF7;padding:18px}
+  .stage .k{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);letter-spacing:.12em;text-transform:uppercase}
+  .stage .t{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16.5px;margin:6px 0 6px}
+  .stage p{font-size:13.5px;color:#33343A}
+  .stage .cost{margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--steel)}
+
+  /* Code-ish block */
+  .spec{background:var(--panel);color:var(--panel-ink);padding:22px 24px;font-family:'JetBrains Mono',monospace;font-size:12.8px;line-height:1.7;overflow-x:auto;margin:20px 0}
+  .spec .c{color:#8A93A3}
+  .spec .r{color:#FF6B7A}
+  .spec .g{color:#9ECE9A}
+
+  /* Tables */
+  table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14px}
+  th{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;text-align:left;color:var(--steel);border-bottom:2px solid var(--ink);padding:10px 12px 8px}
+  td{border-bottom:1px solid var(--line);padding:12px;vertical-align:top;color:#26272C}
+  td b{font-weight:600}
+  tr:hover td{background:#FBFAF7}
+
+  /* Dark section — autonomy ladder */
+  .dark{background:var(--panel);color:var(--panel-ink);border-top:none}
+  .dark h2{color:#fff}
+  .dark p{color:#C9CCD4}
+  .dark .eyebrow{color:#FF6B7A}
+  .ladder{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end;margin:34px 0 8px}
+  .rung{border:1px solid #3A3D45;background:#1E2027;padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px}
+  .rung .lv{font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A93A3}
+  .rung .nm{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff}
+  .rung .hu{font-size:12.5px;color:#AEB3BE;line-height:1.5}
+  .rung:nth-child(1){min-height:120px}.rung:nth-child(2){min-height:150px}
+  .rung:nth-child(3){min-height:180px}.rung:nth-child(4){min-height:210px}
+  .rung:nth-child(5){min-height:240px}
+  .rung.here{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+  .rung.here .lv{color:#FF6B7A}
+  .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
+  .rule{border-left:2px solid var(--red);padding:2px 0 2px 16px}
+  .rule .t{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;margin-bottom:4px}
+  .rule p{font-size:13px}
+
+  /* Horizon timeline */
+  .horizons{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--ink);margin-top:28px}
+  .hz{padding:22px;border-right:1px solid var(--ink);background:#FBFAF7}
+  .hz:last-child{border-right:none}
+  .hz .hn{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);letter-spacing:.12em;text-transform:uppercase}
+  .hz .ht{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;margin:6px 0 4px}
+  .hz .hd{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--steel);margin-bottom:10px}
+  .hz ul{list-style:none;font-size:13px;color:#33343A}
+  .hz li{padding:5px 0 5px 16px;position:relative;line-height:1.5}
+  .hz li::before{content:"—";position:absolute;left:0;color:var(--red)}
+
+  /* Risk list */
+  .risks{margin-top:10px}
+  .risk{display:grid;grid-template-columns:260px 1fr;gap:18px;padding:14px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .risk .rn{font-weight:600}
+  .risk .rm{color:#33343A}
+  .risk .rm b{color:var(--red);font-weight:600}
+
+  /* Closing */
+  .closing{padding:80px 0 96px}
+  .closing .big{font-family:'Space Grotesk',sans-serif;font-size:clamp(20px,2.6vw,27px);font-weight:500;line-height:1.45;max-width:74ch;color:var(--ink)}
+  .closing .big em{font-style:normal;color:var(--red)}
+  .sig{margin-top:36px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--steel)}
+
+  .status{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;padding:2px 8px;border:1px solid var(--line);color:var(--steel);border-radius:2px;margin-left:8px;vertical-align:middle}
+  .status.proven{border-color:#3B6D11;color:#3B6D11}
+  .status.emerging{border-color:#B7950B;color:#B7950B}
+  .status.spec{border-color:var(--red);color:var(--red)}
+
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+  @media (max-width:820px){
+    .stratum,.strata-head{grid-template-columns:1fr}
+    .stratum .name{border-right:none;border-bottom:1px solid var(--line)}
+    .stratum .col:first-of-type{border-right:none;border-bottom:1px dashed var(--line)}
+    .strata-head{display:none}
+    .funnel,.rules,.horizons,.ladder{grid-template-columns:1fr}
+    .hz{border-right:none;border-bottom:1px solid var(--ink)}
+    .rung{min-height:auto !important}
+    .risk{grid-template-columns:1fr;gap:4px}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">TFS · Vision Document · August 2026</div>
+    <h1>AI-DLC 2029<br><span class="accent">From Governed Enablement<br>to Bounded Autonomy</span></h1>
+    <p class="sub">A direction-setting vision for how TFS accumulates software-building capability — skills, memory, judgment — in a form that survives model churn, tool churn, and team churn.</p>
+    <div class="meta">
+      <span>STATUS <b>DIRECTIONAL — NOT AN IMPLEMENTATION PLAN</b></span>
+      <span>SPINE <b>KIRO · AGENTCORE GATEWAY · CEDAR · OKTA</b></span>
+      <span>MARKERS <b><span class="status proven">PROVEN</span> <span class="status emerging">EMERGING</span> <span class="status spec">SPECULATIVE</span></b></span>
+    </div>
+    <div class="thesis">
+      <p><b>The question this vision answers:</b> how does an organization accumulate software-building capability that agents can act on with earned, bounded autonomy — when every gateway, IDE, and model we use today will be replaced along the way?</p>
+    </div>
+  </div>
+</header>
+
+<section id="planes">
+  <div class="wrap">
+    <div class="secnum">01</div>
+    <div class="eyebrow">The organizing idea</div>
+    <h2>Five planes, evolving at different speeds</h2>
+    <p>Today's architecture is a pipeline: IDE → rules → CLI → gateway → tools. The long-term architecture is five planes owned by different disciplines. The planes that matter most are <b>Skill</b> and <b>Memory</b> — they are where capability compounds. Gateways and IDEs are replaceable rentals; a curated skill library and a truthful memory fabric appreciate for a decade.</p>
+
+    <div class="strata-head reveal"><span></span><span>Today · 2026</span><span>Vision · 2029</span></div>
+    <div class="strata reveal">
+      <div class="stratum">
+        <div class="name"><span class="t">Interaction</span><span class="d">Where humans and agents meet</span></div>
+        <div class="col"><span class="lbl">Today</span>Kiro IDE + TFS Core CLI (<span class="mono">tfs</span>), dual-mode binary</div>
+        <div class="col"><span class="lbl">2029</span>Any surface. Intent and approvals from anywhere; humans mostly review, rarely type code</div>
+      </div>
+      <div class="stratum hot">
+        <div class="name"><span class="t">Skill</span><span class="d">How work should be done</span></div>
+        <div class="col"><span class="lbl">Today</span>Static steering rules synced per-IDE — load everything, always</div>
+        <div class="col"><span class="lbl">2029</span>Versioned, signed skill registry with semantic routing and just-in-time loading</div>
+      </div>
+      <div class="stratum hot">
+        <div class="name"><span class="t">Memory</span><span class="d">What is true about our systems</span></div>
+        <div class="col"><span class="lbl">Today</span>Specs repo + ADRs in git</div>
+        <div class="col"><span class="lbl">2029</span>Memory fabric: git as truth, knowledge graph for relationships, episodic store for experience</div>
+      </div>
+      <div class="stratum">
+        <div class="name"><span class="t">Governance</span><span class="d">What is allowed</span></div>
+        <div class="col"><span class="lbl">Today</span>Okta OIDC · Cedar ALLOW / APPROVE / DENY · CloudWatch audit</div>
+        <div class="col"><span class="lbl">2029</span>Same spine + eval-gated autonomy, agent identity lifecycle, autonomy budgets</div>
+      </div>
+      <div class="stratum">
+        <div class="name"><span class="t">Execution</span><span class="d">Where actions land</span></div>
+        <div class="col"><span class="lbl">Today</span>AgentCore Gateway → PDLC &amp; IDP MCP tools</div>
+        <div class="col"><span class="lbl">2029</span>Fleet execution, simulation-first changes, blast-radius isolation</div>
+      </div>
+    </div>
+    <p class="strata-caption">Design rule that follows: <b>own the content, rent the runtime.</b> Skills, specs, decisions, evals, and policies are ours in git. Gateways, indexes, and models are replaceable.</p>
+  </div>
+</section>
+
+<section id="skills">
+  <div class="wrap">
+    <div class="secnum">02</div>
+    <div class="eyebrow">The skill plane</div>
+    <h2>An economy, not a folder</h2>
+    <p>Industry experts now publish skills for review, architecture, security, testing. Loading everything on every request fails three ways: context bloat, staleness, and provenance — a skill file from a blog post is a supply-chain risk when an agent will act on it. The answer is to treat skills like software dependencies: versioned, owned, signed, tested, measured.</p>
+
+    <div class="spec reveal"><span class="c"># A certified skill in the registry</span>
+skill: <span class="g">tfs.architecture.adr-authoring</span>   version: 2.3.1
+owner: architecture-guild        applies_to: [inception]
+triggers:
+  semantic: <span class="g">"creating or revising architecture decision records"</span>
+  signals:  [<span class="g">"*.adr.md"</span>, <span class="g">"docs/adr/**"</span>]
+provenance:
+  source: internal | vendor | community
+  signed_by: <span class="r">TFS Skill Authority (Sigstore)</span>   reviewed: 2026-07-14
+evals:    suite: adr-quality-v4     passing_score: 0.87
+telemetry: invocations_90d: 412     human_override_rate: 6%</div>
+
+    <h3>Right skill, right time — without reading everything <span class="status emerging">EMERGING</span></h3>
+    <p>RAG is the right instinct, with one refinement: <b>RAG the catalog, not just the content.</b> Git remains the source of truth; the vector index is a disposable, derived artifact rebuilt on merge. Never let the index become authoritative — that inverts the trust model.</p>
+
+    <div class="funnel reveal">
+      <div class="stage">
+        <span class="k">Stage 1 · Always loaded</span>
+        <div class="t">The index card</div>
+        <p>Every certified skill contributes ~40 tokens: name, purpose, trigger hints. The agent knows what exists — the way a senior engineer knows a checklist exists without reciting it.</p>
+        <div class="cost">300 skills ≈ 12K tokens</div>
+      </div>
+      <div class="stage">
+        <span class="k">Stage 2 · On demand</span>
+        <div class="t">The body, retrieved</div>
+        <p>Task matches trigger — deterministic signals (file patterns, AI-DLC phase) plus semantic match — and the full body is fetched from git via hybrid retrieval: lexical + vector + graph.</p>
+        <div class="cost">~2–5K tokens per active skill</div>
+      </div>
+      <div class="stage">
+        <span class="k">Stage 3 · After use</span>
+        <div class="t">Unloaded</div>
+        <p>Skill bodies leave context when their task segment completes. The context window is a workbench, not a warehouse.</p>
+        <div class="cost">Net context stays flat as library grows</div>
+      </div>
+    </div>
+
+    <h3>Skills earn their place <span class="status spec">SPECULATIVE</span></h3>
+    <p>Every invocation logs outcome signals — acceptance, override rate, eval movement. High-override skills get flagged to owners; unused skills get deprecation notices. The library becomes a living economy where usage and quality data drive curation, not a wiki graveyard.</p>
+  </div>
+</section>
+
+<section id="memory">
+  <div class="wrap">
+    <div class="secnum">03</div>
+    <div class="eyebrow">The memory plane</div>
+    <h2>Making the agent a tenured engineer</h2>
+    <p>A ten-year engineer is valuable for three different kinds of memory. The architecture should mirror them — and in a brownfield estate, this fabric is the asset competitors cannot download.</p>
+
+    <table class="reveal">
+      <thead><tr><th style="width:16%">Memory</th><th style="width:34%">Human equivalent</th><th style="width:28%">System</th><th>Medium</th></tr></thead>
+      <tbody>
+        <tr><td><b>Semantic</b></td><td>"Payments is event-driven because sync failed under load in 2023"</td><td>Specs, ADRs, contracts — decisions <i>with the why-nots</i></td><td><b>Git</b> — durable, reviewable, versioned</td></tr>
+        <tr><td><b>Relational</b></td><td>"Touch the rate engine → talk to pricing; three services consume that contract"</td><td>Knowledge graph: services ↔ owners ↔ contracts ↔ incidents</td><td>Graph store fed from CMDB, git, gateway telemetry</td></tr>
+        <tr><td><b>Episodic</b></td><td>"Last schema migration there broke the nightly job — check the crons"</td><td>Session outcomes, approvals, postmortems, what-worked</td><td>Structured store distilled from CloudWatch / S3 logs</td></tr>
+      </tbody>
+    </table>
+
+    <h3>The context compiler <span class="status emerging">EMERGING</span></h3>
+    <p>The piece most of the industry is missing: agents don't need <i>more</i> context — they need <b>compiled</b> context. Before a task, a compiler assembles a task-scoped briefing inside an explicit token budget, with provenance on every chunk so claims are citable and checkable.</p>
+
+    <div class="spec reveal"><span class="c"># Compiled context pack — budget 30K tokens</span>
+task: <span class="g">"Add retry logic to payment webhook handler"</span>
+pack:
+  architecture-overview.md ............ 3K   <span class="c">(project memory)</span>
+  payment-service spec §4 webhooks .... 5K   <span class="c">(section, not the whole spec)</span>
+  ADR-019 idempotency + why-nots ...... 2K   <span class="c">(semantic)</span>
+  contract: payment ↔ notification .... 1K   <span class="c">(graph)</span>
+  episodic: 2026-03 retry storm ....... 2K   <span class="c">(ranked by relevance)</span>
+  skills index ....................... 12K   <span class="c">(always on)</span>
+  active skill bodies ................. 5K   <span class="c">(JIT)</span></div>
+
+    <h3>Memory hygiene: the gardener <span class="status emerging">EMERGING</span></h3>
+    <p>Memory that only grows becomes noise. A scheduled memory-gardener agent — running under its own persona and Cedar policy like everything else — distills episodic logs into summaries, flags contradictions between specs and observed behavior into the reconciliation loop, and proposes archival. It never deletes source records; it curates the derived layers. The tech is buildable today; the discipline is the hard part.</p>
+  </div>
+</section>
+
+<section id="autonomy" class="dark">
+  <div class="wrap">
+    <div class="secnum" style="color:#8A93A3">04</div>
+    <div class="eyebrow">The autonomy ladder</div>
+    <h2>Trust is earned per-domain, not granted globally</h2>
+    <p>Autonomy is not a switch; it is a ladder where each rung is unlocked by evidence. An agent may hold L3 for test authoring in brownfield Java while holding L1 for schema migrations. The unit of trust is <span class="mono" style="color:#fff">(agent, skill domain, blast radius)</span> — recorded as Cedar policy, so it is enforceable and revocable, not aspirational.</p>
+
+    <div class="ladder reveal">
+      <div class="rung"><span class="lv">L0</span><span class="nm">Assist</span><span class="hu">Human writes, agent suggests</span></div>
+      <div class="rung"><span class="lv">L1</span><span class="nm">Supervised</span><span class="hu">Human reviews every action</span></div>
+      <div class="rung here"><span class="lv">L2 · WE ARE HERE</span><span class="nm">Gated autonomy</span><span class="hu">APPROVE flow gates flagged actions; Cedar + approvals live</span></div>
+      <div class="rung"><span class="lv">L3</span><span class="nm">Policy autonomy</span><span class="hu">Humans review exceptions and samples. Gate: eval scores ≥ threshold over N tasks, incident-free window</span></div>
+      <div class="rung"><span class="lv">L4</span><span class="nm">Fleet autonomy</span><span class="hu">Humans set intent, budgets, constraints; handle escalations. Gate: L3 across domain + simulation-first + proven rollback</span></div>
+    </div>
+
+    <div class="rules reveal">
+      <div class="rule"><div class="t">Scoped, never global</div><p>Autonomy level attaches to a domain and blast radius, expressed in Cedar — auditable, revocable.</p></div>
+      <div class="rule"><div class="t">Budgeted</div><p>Every autonomous run carries limits: files and services touchable, spend ceiling, wall-clock, required rollback plan. Exceeding any budget converts the run to APPROVE mid-flight.</p></div>
+      <div class="rule"><div class="t">Demotion is automatic</div><p>An incident traced to an autonomous change, or an eval drop after a model upgrade, demotes the domain one level pending review. Model upgrades are dependency upgrades: re-run evals before restoring autonomy.</p></div>
+    </div>
+
+    <p style="margin-top:28px">Honesty about L4: fleet autonomy — agents dispatching sub-agents over A2A, humans managing by exception — is where the industry points, but nobody runs it safely at financial-services scale today. This vision's job is to make every layer we build a <i>prerequisite</i> for L4, not a rewrite.</p>
+  </div>
+</section>
+
+<section id="governance">
+  <div class="wrap">
+    <div class="secnum">05</div>
+    <div class="eyebrow">The governance plane</div>
+    <h2>The spine we have, plus three missing organs</h2>
+    <p>Okta OIDC, Cedar three-state policy at AgentCore Gateway, the approval Lambda, CloudWatch audit, Kiro prompt logs to S3 — that spine extends unchanged. Three organs are missing for the long term.</p>
+
+    <h3>1 · Evals as infrastructure — the biggest gap <span class="status emerging">EMERGING</span></h3>
+    <p>Nothing in the skill economy or the autonomy ladder works without measurement. Every certified skill ships a scenario suite, re-run on every model change. Per-persona benchmarks are drawn from <b>our</b> codebase — brownfield-representative, scored on correctness, standards compliance, and safety behavior (does it stop at DENY, does it request approval properly). A model upgrade that drops eval scores blocks autonomy promotion the way a failing test blocks a merge. Evals-as-code lives in git next to skills.</p>
+
+    <h3>2 · Agent identity as a lifecycle <span class="status proven">PROVEN PATTERN</span></h3>
+    <p>Today agents borrow the developer's Okta identity. At L3+ agents act on schedules and on other agents' behalf, so they need non-human identities: issued per agent, scoped per domain, short-lived credentials via on-behalf-of exchange, revocable independently of any human, visible in every audit record as <span class="mono">acting_agent</span> + <span class="mono">on_behalf_of</span>. NHI sprawl is a named risk — inventory with owners, reviewed quarterly, like service accounts.</p>
+
+    <h3>3 · Simulation before production <span class="status spec">SPECULATIVE (full replay) · pragmatic versions buildable now</span></h3>
+    <p>Before an L3+ agent executes against real systems, it executes against a shadow: ephemeral infra from IaC, synthetic-but-shaped data. The diff between simulated intent and simulated outcome attaches to the approval request — the tech lead reviews <b>evidence, not promises</b>. Applied by risk tier: schema changes earn simulation; a unit-test PR does not.</p>
+
+    <h3>Observability grows up</h3>
+    <p>Audit answers "what happened." Operations needs "is it healthy": SLOs for agent work (approval turnaround, override rate, eval drift, cost per merged change), sampled reasoning-trace review, and anomaly detection on tool-call patterns — an agent enumerating repos at 3 a.m. is a security signal, not a productivity one.</p>
+  </div>
+</section>
+
+<section id="people">
+  <div class="wrap">
+    <div class="secnum">06</div>
+    <div class="eyebrow">The operating model</div>
+    <h2>What changes for people</h2>
+    <p><b>Personas become a roster.</b> Today a persona configures one agent. By L3+, the architect persona is a standing architecture agent reviewing every design for pattern compliance — personas stop being hats humans put on agents and become roles agents occupy, with humans in named oversight positions.</p>
+    <p><b>New roles emerge:</b> skill curators (guild-owned), eval engineers, memory-gardener supervisors, and a platform team that runs the five planes as a product with internal customers.</p>
+    <p><b>The ladder shifts</b> from "writes excellent code" toward "specifies intent precisely, verifies rigorously, and encodes judgment into skills others — human and agent — reuse." Skill-library contribution becomes a measured artifact of seniority, the way open-source contribution is today.</p>
+    <p><b>Brownfield stays the differentiator.</b> The industry demos greenfield. TFS's advantage is a memory fabric that makes fifteen-year-old systems legible to agents — an asset competitors cannot download.</p>
+  </div>
+</section>
+
+<section id="bets">
+  <div class="wrap">
+    <div class="secnum">07</div>
+    <div class="eyebrow">Surviving the churn</div>
+    <h2>Standards bets, stated and revisable</h2>
+    <table class="reveal">
+      <thead><tr><th style="width:26%">Bet</th><th>Position</th><th style="width:18%">Confidence</th></tr></thead>
+      <tbody>
+        <tr><td><b>MCP</b> for tool access</td><td>All tool access through MCP behind AgentCore Gateway</td><td>High</td></tr>
+        <tr><td><b>Cedar</b> for policy</td><td>All authorization as Cedar; portable even off AgentCore</td><td>High</td></tr>
+        <tr><td><b>Markdown-in-git</b> for skills, specs, ADRs, evals</td><td>Survives every IDE and model change — this is the hedge</td><td>Highest</td></tr>
+        <tr><td><b>A2A</b> for agent-to-agent</td><td>Prototype in 2027; nothing load-bearing yet</td><td>Medium</td></tr>
+        <tr><td><b>Managed knowledge graph</b></td><td>Adopt if it ingests our git/CMDB and exports openly; else build thin. Avoid lock-in on the memory plane above all</td><td>Medium</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="horizons">
+  <div class="wrap">
+    <div class="secnum">08</div>
+    <div class="eyebrow">The road</div>
+    <h2>Three horizons, each valuable if we stop there</h2>
+    <div class="horizons reveal">
+      <div class="hz">
+        <span class="hn">Horizon 1</span>
+        <div class="ht">Governed Enablement</div>
+        <div class="hd">now → mid-2027</div>
+        <ul>
+          <li>Gateway + Cedar + approvals in production; <span class="mono">tfs</span> dual-mode CLI; three-tier steering</li>
+          <li>Specs repo + reconciliation loop; Kiro logging to S3</li>
+          <li><b>From this vision:</b> skill index cards + JIT loading; eval suite v1 for two personas; agent identity inventory</li>
+        </ul>
+      </div>
+      <div class="hz">
+        <span class="hn">Horizon 2</span>
+        <div class="ht">The Knowing Organization</div>
+        <div class="hd">2027 → 2028</div>
+        <ul>
+          <li>Skill registry: signing, telemetry, lifecycle</li>
+          <li>Knowledge graph over services, contracts, decisions; context compiler with budgets + provenance</li>
+          <li>Memory gardener in production</li>
+          <li>Eval-gated L3 in two low-risk domains (tests, docs, dependency updates); simulation-lite by risk tier</li>
+        </ul>
+      </div>
+      <div class="hz">
+        <span class="hn">Horizon 3</span>
+        <div class="ht">Bounded Autonomy</div>
+        <div class="hd">2028 → 2029</div>
+        <ul>
+          <li>Standing role agents on A2A; human oversight roles named</li>
+          <li>Autonomy budgets enforced at the gateway</li>
+          <li>L4 pilots in tightly scoped domains with demonstrated rollback</li>
+          <li>Skill library + memory fabric managed as a balance-sheet asset</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:16px">A vision that only pays off at the end is a bet; one that pays per phase is a strategy.</p>
+  </div>
+</section>
+
+<section id="risks">
+  <div class="wrap">
+    <div class="secnum">09</div>
+    <div class="eyebrow">Named risks</div>
+    <h2>What could make this fail</h2>
+    <div class="risks reveal">
+      <div class="risk"><div class="rn">Skill supply-chain compromise</div><div class="rm">A poisoned community skill is prompt injection with a certificate. <b>Mitigation:</b> signing, review gate, eval quarantine for new skills.</div></div>
+      <div class="risk"><div class="rn">Memory poisoning / staleness</div><div class="rm">Wrong "truth" scales worse than no truth. <b>Mitigation:</b> provenance on every retrieved chunk, contradiction detection, git as reviewable source.</div></div>
+      <div class="risk"><div class="rn">Eval theater</div><div class="rm">Suites that don't reflect brownfield reality grant false autonomy. <b>Mitigation:</b> draw eval tasks from real incident and PR history.</div></div>
+      <div class="risk"><div class="rn">Autonomy ratchet</div><div class="rm">Pressure to promote levels without evidence after early wins. <b>Mitigation:</b> promotion criteria in policy; demotion automatic; both auditable.</div></div>
+      <div class="risk"><div class="rn">Human skill atrophy</div><div class="rm">Verification quality decays if seniors stop building. <b>Mitigation:</b> rotation through skill authorship and eval engineering as build roles.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="closing" style="border-top:6px solid var(--red)">
+  <div class="wrap">
+    <div class="eyebrow">The one-paragraph version</div>
+    <p class="big" style="margin-top:16px">We are building toward an organization where <em>skills are governed, signed packages</em> routed to agents just-in-time; where <em>organizational memory lives in git as truth</em>, with graph and episodic layers that make agents behave like tenured engineers; where <em>autonomy is earned per-domain</em> through evals, bounded by budgets, and revoked by evidence — and where the governance spine we run today extends unchanged into a world of agent fleets. The gateways and IDEs will be replaced along the way. The skill library, the memory fabric, and the eval record are the assets that compound. And they are ours.</p>
+    <div class="sig">TFS AI-DLC PLATFORM · VISION 2029 · DRAFT FOR LEADERSHIP DISCUSSION</div>
+  </div>
+</section>
+
+<script>
+  const obs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); obs.unobserve(e.target);} });
+  },{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+</script>
+</body>
+</html>
